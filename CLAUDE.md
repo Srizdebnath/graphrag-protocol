@@ -51,6 +51,29 @@ python hackathon/scripts/run_benchmark.py
 
 ---
 
+## Git Workflow (IMPORTANT — follow this)
+
+Branches:
+- **`main`** — production / releases ONLY. Never push code directly.
+- **`dev`** — all active development. This is the working branch.
+
+Rules for agents and humans:
+1. Do ALL work on `dev`. Commit to `dev` with clear messages.
+2. `main` is only touched for a release: `git push origin dev:main` after everything passes.
+3. NEVER commit secrets: `.env`, `*.pem`, API keys, GSQL secrets. `.gitignore` covers `.env`.
+4. Before every commit: `git status` → verify only intended files → `git add` specific paths (not `-A` blindly).
+5. Commit messages: conventional format (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`).
+6. Small, frequent commits over large ones — keep history reviewable.
+
+```bash
+git switch dev                 # always work on dev
+git add <specific files>
+git commit -m "feat: add X"
+git push origin dev
+```
+
+---
+
 ## Environment Variables
 
 Create `.env` in project root:
