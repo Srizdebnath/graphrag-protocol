@@ -1,0 +1,62 @@
+[
+  {
+    "id": "q031",
+    "category": "global",
+    "query": "What are the dominant research themes across the 8000 papers in this corpus?",
+    "papers": []
+  },
+  {
+    "id": "q032",
+    "category": "global",
+    "query": "Which arXiv categories appear most frequently in the dataset and what do they reveal about the research landscape?",
+    "papers": []
+  },
+  {
+    "id": "q033",
+    "category": "global",
+    "query": "What are the most common methods or techniques mentioned across the paper titles in this collection?",
+    "papers": []
+  },
+  {
+    "id": "q034",
+    "category": "global",
+    "query": "How is research on large language models (LLMs) represented across different arXiv categories in this dataset?",
+    "papers": []
+  },
+  {
+    "id": "q035",
+    "category": "global",
+    "query": "What role do benchmarking and evaluation play across the papers in this corpus?",
+    "papers": []
+  },
+  {
+    "id": "q036",
+    "category": "global",
+    "query": "What are the main application domains targeted by the AI research papers in this dataset?",
+    "papers": []
+  },
+  {
+    "id": "q037",
+    "category": "global",
+    "query": "How prevalent is graph-based learning across the different research areas represented in the corpus?",
+    "papers": []
+  },
+  {
+    "id": "q038",
+    "category": "global",
+    "query": "What trends in multimodal AI research can be observed from the paper titles and categories in this dataset?",
+    "papers": []
+  },
+  {
+    "id": "q039",
+    "category": "global",
+    "query": "How is research on agent-based systems distributed across the AI subfields in this collection?",
+    "papers": []
+  },
+  {
+    "id": "q040",
+    "category": "global",
+    "query": "What are the most active intersection areas between different arXiv categories in this corpus?",
+    "papers": []
+  }
+]

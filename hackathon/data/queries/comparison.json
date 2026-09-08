@@ -1,0 +1,92 @@
+[
+  {
+    "id": "q041",
+    "category": "comparison",
+    "query": "How do the approaches to knowledge graph embedding (Pattern Over-Generalization paper) and knowledge graph completion for inductive settings (PEARL paper) differ in their methods?",
+    "papers": [
+      "2609.03487",
+      "2609.02216"
+    ]
+  },
+  {
+    "id": "q042",
+    "category": "comparison",
+    "query": "Compare the two papers on on-policy distillation: 'RISE: Recursive Improvement via Self-Extrapolating Policy Distillation' and 'What Matters in On-Policy Distillation?'. What are their key differences?",
+    "papers": [
+      "2609.05295",
+      "2609.05198"
+    ]
+  },
+  {
+    "id": "q043",
+    "category": "comparison",
+    "query": "How do the two papers on diffusion language models differ in their proposed approaches and applications?",
+    "papers": [
+      "2609.04778",
+      "2609.04531"
+    ]
+  },
+  {
+    "id": "q044",
+    "category": "comparison",
+    "query": "Compare the approaches to multimodal analysis in 'SMILE: Self-Explainable Multimodal Information Bottleneck for Medical Diagnosis' and 'From Vision to Language: Investigating Causal Information Flow in Multimodal Decision Making'.",
+    "papers": [
+      "2609.05174",
+      "2609.05149"
+    ]
+  },
+  {
+    "id": "q045",
+    "category": "comparison",
+    "query": "How do the papers on counterfactual explanations for GNNs and GNN-based watermarking for ownership verification address different challenges in graph neural network trustworthiness?",
+    "papers": [
+      "2609.05113",
+      "2609.04772"
+    ]
+  },
+  {
+    "id": "q046",
+    "category": "comparison",
+    "query": "Compare the two papers on retrieval-augmented generation: context compression (Soft Context Compression paper) and the Qlippy assistant for quantum workflows. What are their different strategies?",
+    "papers": [
+      "2609.05152",
+      "2609.05039"
+    ]
+  },
+  {
+    "id": "q047",
+    "category": "comparison",
+    "query": "How do the papers on knowledge graph completion for vulnerability identification (Athena) and scientific hypothesis discovery (HyGRAIL) differ in their use of knowledge graphs?",
+    "papers": [
+      "2609.01187",
+      "2609.02056"
+    ]
+  },
+  {
+    "id": "q048",
+    "category": "comparison",
+    "query": "Compare the approaches to transformer analysis in the influence score paper and the transformer compression paper for plant disease detection.",
+    "papers": [
+      "2609.05074",
+      "2609.05334"
+    ]
+  },
+  {
+    "id": "q049",
+    "category": "comparison",
+    "query": "How do the two papers on multimodal chain-of-thought reasoning and multimodal instruction-following evaluation differ in their evaluation methodologies?",
+    "papers": [
+      "2609.04947",
+      "2609.04859"
+    ]
+  },
+  {
+    "id": "q050",
+    "category": "comparison",
+    "query": "Compare the papers on cooperative multi-agent reinforcement learning change-point detection and reinforcement learning for solar PV policy design. What different RL paradigms do they use?",
+    "papers": [
+      "2609.05298",
+      "2609.04880"
+    ]
+  }
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "q001",
+    "category": "single_hop",
+    "query": "What is the title of the paper authored by Linzhan Mou, Jiahui Lei, and Zhiyang Dou?",
+    "papers": [
+      "2609.05415"
+    ]
+  },
+  {
+    "id": "q002",
+    "category": "single_hop",
+    "query": "What problem does the paper 'WearableQA: A Benchmark for Health Reasoning over Real-World Wearable Data' address?",
+    "papers": [
+      "2609.05405"
+    ]
+  },
+  {
+    "id": "q003",
+    "category": "single_hop",
+    "query": "What are the main categories of the paper 'Diffusion TV: Experiencing Diffusion Models through Tangible, Embodied Interaction'?",
+    "papers": [
+      "2609.05404"
+    ]
+  },
+  {
+    "id": "q004",
+    "category": "single_hop",
+    "query": "In the paper 'RegionFed: Federated Learning for Personalized Query Understanding in Heterogeneous Retail Environments', what type of learning is proposed?",
+    "papers": [
+      "2609.05403"
+    ]
+  },
+  {
+    "id": "q005",
+    "category": "single_hop",
+    "query": "What is the ROBORMBENCH paper about regarding vision language reward models?",
+    "papers": [
+      "2609.05401"
+    ]
+  },
+  {
+    "id": "q006",
+    "category": "single_hop",
+    "query": "What technique does the paper 'Necessary or Sufficient? Evaluating LLM Explanations With Behavioural Evidence' propose for evaluating LLM explanations?",
+    "papers": [
+      "2609.05385"
+    ]
+  },
+  {
+    "id": "q007",
+    "category": "single_hop",
+    "query": "What task does the paper 'Influence Score and Transformers interpretability: Measure of the Effective Impact of Attention Heads' address?",
+    "papers": [
+      "2609.05074"
+    ]
+  },
+  {
+    "id": "q008",
+    "category": "single_hop",
+    "query": "What is the main contribution of the paper 'Pattern Over-Generalization of Knowledge Graph Embedding'?",
+    "papers": [
+      "2609.03487"
+    ]
+  },
+  {
+    "id": "q009",
+    "category": "single_hop",
+    "query": "What problem does 'PEARL: Path-Entity Aligned Relational Learning with Contextual Subgraphs for Inductive Knowledge Graph Completion' solve?",
+    "papers": [
+      "2609.02216"
+    ]
+  },
+  {
+    "id": "q010",
+    "category": "single_hop",
+    "query": "What is the focus of the paper 'SMILE: Self-Explainable Multimodal Information Bottleneck for Medical Diagnosis'?",
+    "papers": [
+      "2609.05174"
+    ]
+  },
+  {
+    "id": "q011",
+    "category": "single_hop",
+    "query": "What approach does 'Online Change-point Detection for Cooperative Multi-Agent Reinforcement Learning' propose?",
+    "papers": [
+      "2609.05298"
+    ]
+  },
+  {
+    "id": "q012",
+    "category": "single_hop",
+    "query": "What is the title and main topic of the paper with ID 2609.04772?",
+    "papers": [
+      "2609.04772"
+    ]
+  },
+  {
+    "id": "q013",
+    "category": "single_hop",
+    "query": "What benchmark does 'MM-IFEval-Pro: A Multilingual and Attack-Resistant Benchmark for Instruction-Following Evaluation' evaluate?",
+    "papers": [
+      "2609.04859"
+    ]
+  },
+  {
+    "id": "q014",
+    "category": "single_hop",
+    "query": "What problem does 'HyGRAIL: Cost-Aware and Evidence-Grounded Scientific Hypothesis Discovery over Knowledge Graphs' address?",
+    "papers": [
+      "2609.02056"
+    ]
+  },
+  {
+    "id": "q015",
+    "category": "single_hop",
+    "query": "What is the main contribution of 'Athena: Vulnerability-Affected Library Identification via Knowledge Graph Completion'?",
+    "papers": [
+      "2609.01187"
+    ]
+  }
+]

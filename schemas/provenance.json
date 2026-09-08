@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/provenance.json",
+  "title": "Provenance",
+  "description": "Contract 5: The citation and audit trail attached to any retrieval. Enables full traceability from answer back to source documents, including entities examined-but-not-cited (a novel audit signal for trajectory completeness).",
+  "type": "object",
+  "properties": {
+    "source_documents": {
+      "type": "array",
+      "description": "Source document ids cited by the retrieval results.",
+      "items": { "type": "string" }
+    },
+    "traversal_log": {
+      "type": "array",
+      "description": "Ordered step-by-step log of entities visited during graph traversal.",
+      "items": { "$ref": "#/definitions/TraversalStep" }
+    },
+    "visited_not_cited": {
+      "type": "array",
+      "description": "Entities that were examined during traversal but did not make it into the final cited context. Comparing this against the traversal log yields a trajectory completeness score.",
+      "items": { "type": "string" }
+    },
+    "extraction_provenance": {
+      "type": "array",
+      "description": "Mapping of graph elements (entities/relationships) to the text spans and source documents from which they were extracted.",
+      "items": { "$ref": "#/definitions/ExtractionRecord" },
+      "default": []
+    },
+    "total_entities_examined": {
+      "type": "integer",
+      "description": "Total number of entities visited during traversal."
+    },
+    "total_chunks_examined": {
+      "type": "integer",
+      "description": "Total number of text chunks examined during retrieval."
+    },
+    "total_chunks_returned": {
+      "type": "integer",
+      "description": "Total number of text chunks returned in the final context."
+    },
+    "backend": {
+      "type": "string",
+      "description": "Identifier of the backend that produced these results."
+    },
+    "backend_version": {
+      "type": ["string", "null"],
+      "description": "Optional backend software version string.",
+      "default": null
+    }
+  },
+  "required": [
+    "source_documents",
+    "traversal_log",
+    "visited_not_cited",
+    "extraction_provenance",
+    "total_entities_examined",
+    "total_chunks_examined",
+    "total_chunks_returned",
+    "backend",
+    "backend_version"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "TraversalStep": {
+      "type": "object",
+      "description": "A single step in the graph traversal audit log.",
+      "properties": {
+        "step": { "type": "integer", "description": "Step ordinal (1-based)." },
+        "entity": { "type": "string", "description": "Entity id visited at this step." },
+        "action": {
+          "type": "string",
+          "description": "Action taken at this step (e.g., 'seed', 'expand', 'match', 'prune')."
+        },
+        "edge": {
+          "type": ["string", "null"],
+          "description": "Optional edge id traversed to reach this entity.",
+          "default": null
+        }
+      },
+      "required": ["step", "entity", "action", "edge"]
+    },
+    "ExtractionRecord": {
+      "type": "object",
+      "description": "Maps a graph element to its extraction provenance.",
+      "properties": {
+        "element_id": {
+          "type": "string",
+          "description": "The entity or relationship id this record describes."
+        },
+        "source_doc": {
+          "type": "string",
+          "description": "The source document from which the element was extracted."
+        },
+        "chunk_id": {
+          "type": "string",
+          "description": "The text chunk id containing the extracted span."
+        },
+        "extracted_text": {
+          "type": "string",
+          "description": "The verbatim text span that justified extraction."
+        },
+        "confidence": {
+          "type": "number",
+          "description": "Extraction confidence in [0, 1].",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["element_id", "source_doc", "chunk_id", "extracted_text", "confidence"]
+    }
+  }
+}

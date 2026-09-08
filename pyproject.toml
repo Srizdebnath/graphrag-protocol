@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphrag-protocol"
+version = "0.1.0"
+description = "Universal GraphRAG Interoperability Protocol - standard contracts + MCP server + adapters to query any GraphRAG backend uniformly"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "graphrag-protocol contributors" }
+]
+keywords = ["graphrag", "knowledge-graph", "mcp", "retrieval", "graph", "protocol", "rag"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "pydantic>=2",
+    "mcp",
+    "pyTigerGraph",
+    "google-genai",
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "click",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+rag = [
+    "chromadb",
+    "bert-score",
+]
+eval = [
+    "bert-score",
+]
+
+[project.scripts]
+graphrag-server = "mcp_server.server:main"
+
+[tool.setuptools.packages.find]
+include = ["mcp_server*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

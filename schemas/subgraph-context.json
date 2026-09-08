@@ -1,0 +1,275 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/subgraph-context.json",
+  "title": "SubgraphContext",
+  "description": "Contract 2: The standard response format returned by all retrieval operations. Encapsulates the retrieved subgraph (entities, relationships, paths, communities, text chunks), provenance, and retrieval metrics in a uniform structure.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "operation": {
+      "type": "string",
+      "description": "Echo of the retrieval operation that produced this context.",
+      "enum": [
+        "local_search",
+        "global_search",
+        "hybrid_search",
+        "entity_lookup",
+        "path_search",
+        "neighborhood",
+        "community_members"
+      ]
+    },
+    "query": {
+      "type": "object",
+      "description": "Echo of the original retrieval request.",
+      "properties": {
+        "text": { "type": "string", "description": "The original query text." },
+        "entity_hints": {
+          "type": "array",
+          "description": "Entity hints supplied in the request.",
+          "items": { "type": "string" }
+        },
+        "depth": { "type": "integer", "description": "Traversal depth used." },
+        "top_k": { "type": "integer", "description": "Result cap used." }
+      },
+      "required": ["text", "entity_hints", "depth", "top_k"]
+    },
+    "results": {
+      "type": "object",
+      "description": "The retrieved subgraph contents.",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "description": "Retrieved entities with relevance scores and source chunk references.",
+          "items": { "$ref": "#/definitions/Entity" }
+        },
+        "relationships": {
+          "type": "array",
+          "description": "Retrieved edges between entities.",
+          "items": { "$ref": "#/definitions/Relationship" }
+        },
+        "paths": {
+          "type": "array",
+          "description": "Multi-hop paths discovered between entities.",
+          "items": { "$ref": "#/definitions/PathResult" }
+        },
+        "communities": {
+          "type": "array",
+          "description": "Community summaries matched by the query.",
+          "items": { "$ref": "#/definitions/CommunitySummary" }
+        },
+        "text_chunks": {
+          "type": "array",
+          "description": "Source text chunks supporting the retrieved entities/relationships.",
+          "items": { "$ref": "#/definitions/TextChunk" }
+        }
+      },
+      "required": ["entities", "relationships", "paths", "communities", "text_chunks"]
+    },
+    "provenance": {
+      "description": "Contract 5: citation and audit trail for the retrieval.",
+      "$ref": "#/definitions/Provenance"
+    },
+    "metrics": {
+      "description": "Retrieval performance and coverage metrics.",
+      "$ref": "#/definitions/RetrievalMetrics"
+    }
+  },
+  "required": ["protocol", "operation", "query", "results", "provenance", "metrics"],
+  "additionalProperties": false,
+  "definitions": {
+    "Entity": {
+      "type": "object",
+      "description": "A single knowledge-graph entity.",
+      "properties": {
+        "id": { "type": "string", "description": "Backend-agnostic entity identifier." },
+        "type": { "type": "string", "description": "Entity type/vertex label." },
+        "name": { "type": "string", "description": "Human-readable entity name." },
+        "properties": {
+          "type": "object",
+          "description": "Arbitrary entity attributes.",
+          "additionalProperties": true,
+          "default": {}
+        },
+        "relevance_score": {
+          "type": "number",
+          "description": "Relevance to the query in [0, 1].",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source_chunks": {
+          "type": "array",
+          "description": "IDs of source text chunks supporting this entity.",
+          "items": { "type": "string" },
+          "default": []
+        }
+      },
+      "required": ["id", "type", "name", "properties", "relevance_score", "source_chunks"]
+    },
+    "Relationship": {
+      "type": "object",
+      "description": "A directed edge between two entities.",
+      "properties": {
+        "id": { "type": "string", "description": "Edge identifier." },
+        "source": { "type": "string", "description": "Source entity id." },
+        "target": { "type": "string", "description": "Target entity id." },
+        "type": { "type": "string", "description": "Relationship/edge label." },
+        "weight": {
+          "type": "number",
+          "description": "Edge weight in [0, 1].",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "properties": {
+          "type": "object",
+          "description": "Arbitrary edge attributes.",
+          "additionalProperties": true,
+          "default": {}
+        },
+        "evidence": {
+          "type": "array",
+          "description": "Evidence items (e.g., source chunk + snippet) supporting the edge.",
+          "items": { "type": "object" },
+          "default": []
+        }
+      },
+      "required": ["id", "source", "target", "type", "weight", "properties", "evidence"]
+    },
+    "PathResult": {
+      "type": "object",
+      "description": "A multi-hop path between entities.",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "description": "Ordered entity ids along the path.",
+          "items": { "type": "string" }
+        },
+        "relationships": {
+          "type": "array",
+          "description": "Ordered relationship ids connecting the path entities.",
+          "items": { "type": "string" }
+        },
+        "path_summary": {
+          "type": "string",
+          "description": "Human/machine-readable summary of the path."
+        }
+      },
+      "required": ["entities", "relationships", "path_summary"]
+    },
+    "CommunitySummary": {
+      "type": "object",
+      "description": "A community-detection cluster summary.",
+      "properties": {
+        "id": { "type": "string", "description": "Community identifier." },
+        "level": { "type": "integer", "description": "Hierarchical community level." },
+        "summary": { "type": "string", "description": "Synthesized summary of the community." },
+        "member_count": { "type": "integer", "description": "Number of member entities." },
+        "centroid_entity": {
+          "type": ["string", "null"],
+          "description": "Optional representative entity id.",
+          "default": null
+        }
+      },
+      "required": ["id", "level", "summary", "member_count", "centroid_entity"]
+    },
+    "TextChunk": {
+      "type": "object",
+      "description": "A source text chunk underlying the retrieved content.",
+      "properties": {
+        "id": { "type": "string", "description": "Chunk identifier." },
+        "text": { "type": "string", "description": "The chunk text." },
+        "source_doc": { "type": "string", "description": "Source document identifier." },
+        "token_count": { "type": "integer", "description": "Approximate token count of the chunk." },
+        "relevance_score": {
+          "type": "number",
+          "description": "Relevance in [0, 1].",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": ["id", "text", "source_doc", "token_count", "relevance_score"]
+    },
+    "Provenance": {
+      "type": "object",
+      "description": "Contract 5: citation and audit trail for the retrieval.",
+      "properties": {
+        "source_documents": {
+          "type": "array",
+          "description": "Source document ids cited by the results.",
+          "items": { "type": "string" }
+        },
+        "traversal_log": {
+          "type": "array",
+          "description": "Ordered step-by-step log of entities visited during traversal.",
+          "items": { "$ref": "#/definitions/TraversalStep" }
+        },
+        "visited_not_cited": {
+          "type": "array",
+          "description": "Entities that were examined during traversal but not cited in the final context.",
+          "items": { "type": "string" }
+        },
+        "total_entities_examined": { "type": "integer", "description": "Total entities visited." },
+        "total_chunks_examined": { "type": "integer", "description": "Total chunks considered." },
+        "total_chunks_returned": { "type": "integer", "description": "Total chunks returned in context." },
+        "backend": { "type": "string", "description": "Backend that produced the results." },
+        "backend_version": {
+          "type": ["string", "null"],
+          "description": "Optional backend software version.",
+          "default": null
+        }
+      },
+      "required": [
+        "source_documents",
+        "traversal_log",
+        "visited_not_cited",
+        "total_entities_examined",
+        "total_chunks_examined",
+        "total_chunks_returned",
+        "backend",
+        "backend_version"
+      ]
+    },
+    "TraversalStep": {
+      "type": "object",
+      "description": "A single step in the graph traversal audit log.",
+      "properties": {
+        "step": { "type": "integer", "description": "Step ordinal." },
+        "entity": { "type": "string", "description": "Entity id visited at this step." },
+        "action": { "type": "string", "description": "Action taken (e.g., 'expand', 'match')." },
+        "edge": {
+          "type": ["string", "null"],
+          "description": "Optional edge id traversed.",
+          "default": null
+        }
+      },
+      "required": ["step", "entity", "action", "edge"]
+    },
+    "RetrievalMetrics": {
+      "type": "object",
+      "description": "Retrieval performance and coverage metrics.",
+      "properties": {
+        "input_tokens": { "type": "integer", "description": "Tokens consumed by the query/context." },
+        "entities_returned": { "type": "integer", "description": "Entities returned." },
+        "relationships_returned": { "type": "integer", "description": "Relationships returned." },
+        "paths_found": { "type": "integer", "description": "Paths discovered." },
+        "communities_matched": { "type": "integer", "description": "Communities matched." },
+        "graph_hops_traversed": { "type": "integer", "description": "Total graph hops traversed." },
+        "latency_ms": { "type": "number", "description": "Retrieval latency in milliseconds." }
+      },
+      "required": [
+        "input_tokens",
+        "entities_returned",
+        "relationships_returned",
+        "paths_found",
+        "communities_matched",
+        "graph_hops_traversed",
+        "latency_ms"
+      ]
+    }
+  }
+}

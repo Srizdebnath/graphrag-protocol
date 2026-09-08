@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/retrieval-request.json",
+  "title": "RetrievalRequest",
+  "description": "Contract 1: The standard query format for issuing a retrieval request against any GraphRAG backend. Uniform request envelope regardless of the underlying backend (TigerGraph, Neo4j, LightRAG, etc.).",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0' for this version of the specification.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "operation": {
+      "type": "string",
+      "description": "The retrieval operation to execute. Selects the backend traversal/search strategy.",
+      "enum": [
+        "local_search",
+        "global_search",
+        "hybrid_search",
+        "entity_lookup",
+        "path_search",
+        "neighborhood",
+        "community_members"
+      ]
+    },
+    "query": {
+      "type": "string",
+      "description": "The natural-language query or search text to answer."
+    },
+    "entity_hints": {
+      "type": "array",
+      "description": "Optional entity names/IDs the caller believes are relevant, used to seed graph traversal.",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "depth": {
+      "type": "integer",
+      "description": "Maximum number of graph hops to traverse from seed entities. Bounded to [1, 10].",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 2
+    },
+    "top_k": {
+      "type": "integer",
+      "description": "Maximum number of results (entities, chunks) to return per result category. Bounded to [1, 100].",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 10
+    },
+    "filters": {
+      "type": "object",
+      "description": "Optional attribute filters (e.g., entity_type, year range, category) applied during retrieval.",
+      "additionalProperties": true
+    },
+    "backend": {
+      "type": "string",
+      "description": "Optional backend/graph identifier when operating in a federated or multi-backend environment. Omit to use the default backend.",
+      "default": null
+    }
+  },
+  "required": ["protocol", "operation", "query"],
+  "additionalProperties": false
+}

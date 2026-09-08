@@ -1,0 +1,137 @@
+[
+  {
+    "id": "q016",
+    "category": "multi_hop",
+    "query": "How do papers on knowledge graph embedding and inductive knowledge graph completion differ in their approaches to link prediction?",
+    "papers": [
+      "2609.03487",
+      "2609.02216"
+    ]
+  },
+  {
+    "id": "q017",
+    "category": "multi_hop",
+    "query": "What common challenges do papers on multimodal emotion recognition and multimodal information bottleneck for medical diagnosis share regarding feature encoding?",
+    "papers": [
+      "2609.04690",
+      "2609.05174"
+    ]
+  },
+  {
+    "id": "q018",
+    "category": "multi_hop",
+    "query": "How do the approaches to evaluating LLM explanations and measuring attention head impact in transformers relate to each other?",
+    "papers": [
+      "2609.05385",
+      "2609.05074"
+    ]
+  },
+  {
+    "id": "q019",
+    "category": "multi_hop",
+    "query": "What connections exist between the work on diffusion language models for mobile edge AI and distilled continuous diffusion language models for code generation?",
+    "papers": [
+      "2609.04778",
+      "2609.04531"
+    ]
+  },
+  {
+    "id": "q020",
+    "category": "multi_hop",
+    "query": "How do the papers on knowledge graph embedding pattern over-generalization and uncertain knowledge graph initialization address different aspects of knowledge graph quality?",
+    "papers": [
+      "2609.03487",
+      "2609.02519"
+    ]
+  },
+  {
+    "id": "q021",
+    "category": "multi_hop",
+    "query": "What methodological similarities exist between the approaches for counterfactual explanations of graph neural networks and GNN-based watermark frameworks?",
+    "papers": [
+      "2609.05113",
+      "2609.04772"
+    ]
+  },
+  {
+    "id": "q022",
+    "category": "multi_hop",
+    "query": "How do the papers on on-policy distillation for language models and recursive improvement via self-extrapolating policy distillation both address post-training efficiency?",
+    "papers": [
+      "2609.05295",
+      "2609.05198"
+    ]
+  },
+  {
+    "id": "q023",
+    "category": "multi_hop",
+    "query": "What common themes connect the work on retrieval-augmented generation context compression and the retrieval-augmented GenAI assistant for quantum workflows?",
+    "papers": [
+      "2609.05152",
+      "2609.05039"
+    ]
+  },
+  {
+    "id": "q024",
+    "category": "multi_hop",
+    "query": "How do the approaches to knowledge graph completion for vulnerability-affected library identification and scientific hypothesis discovery both leverage knowledge graphs?",
+    "papers": [
+      "2609.01187",
+      "2609.02056"
+    ]
+  },
+  {
+    "id": "q025",
+    "category": "multi_hop",
+    "query": "What relationships exist between the papers on transformer compression for plant disease detection and the paper on influence scores for transformer interpretability?",
+    "papers": [
+      "2609.05334",
+      "2609.05074"
+    ]
+  },
+  {
+    "id": "q026",
+    "category": "multi_hop",
+    "query": "How do the papers on spatiotemporal graph neural networks for air quality and mesh-based physics learning with hierarchical graph networks both apply graph neural networks?",
+    "papers": [
+      "2609.04693",
+      "2608.13827"
+    ]
+  },
+  {
+    "id": "q027",
+    "category": "multi_hop",
+    "query": "What connections exist between the work on multimodal chain-of-thought reasoning and multimodal time series question answering?",
+    "papers": [
+      "2609.04947",
+      "2609.04842"
+    ]
+  },
+  {
+    "id": "q028",
+    "category": "multi_hop",
+    "query": "How do the papers on reinforcement learning for solar PV policy design and cooperative multi-agent reinforcement learning address different aspects of RL challenges?",
+    "papers": [
+      "2609.04880",
+      "2609.05298"
+    ]
+  },
+  {
+    "id": "q029",
+    "category": "multi_hop",
+    "query": "What common approaches do the papers on LLM-driven quantum circuit synthesis and LLM decompilers share regarding LLM-based problem solving?",
+    "papers": [
+      "2609.05327",
+      "2609.05370"
+    ]
+  },
+  {
+    "id": "q030",
+    "category": "multi_hop",
+    "query": "How do the papers on neural-symbolic spatio-temporal GraphRAG and the Qlippy retrieval-augmented assistant both address knowledge retrieval challenges?",
+    "papers": [
+      "2609.05139",
+      "2609.05039"
+    ]
+  }
+]

@@ -1,0 +1,11 @@
+pydantic>=2
+mcp
+pyTigerGraph
+google-genai
+chromadb
+bert-score
+python-dotenv
+fastapi
+uvicorn
+click
+httpx

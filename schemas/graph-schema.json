@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/graph-schema.json",
+  "title": "GraphSchema",
+  "description": "Contract 3: The schema-introspection response. Describes all vertex types, edge types, attributes, cardinalities, and graph-level statistics in a backend-agnostic form, so agents and LLMs can reason about the graph without a backend-specific query language.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "graph_id": {
+      "type": "string",
+      "description": "Identifier of the graph this schema describes."
+    },
+    "vertex_types": {
+      "type": "array",
+      "description": "All vertex (entity) types in the graph with their attributes and counts.",
+      "items": { "$ref": "#/definitions/EntityType" }
+    },
+    "edge_types": {
+      "type": "array",
+      "description": "All edge (relationship) types in the graph with their source/target cardinalities.",
+      "items": { "$ref": "#/definitions/RelationshipType" }
+    },
+    "statistics": {
+      "description": "Graph-level statistics.",
+      "$ref": "#/definitions/GraphStatistics"
+    }
+  },
+  "required": ["protocol", "graph_id", "vertex_types", "edge_types", "statistics"],
+  "additionalProperties": false,
+  "definitions": {
+    "EntityType": {
+      "type": "object",
+      "description": "A vertex type with its attributes and instance count.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Vertex type / label name."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of instances of this vertex type."
+        },
+        "primary_key": {
+          "type": "string",
+          "description": "Name of the attribute that serves as the entity's primary key."
+        },
+        "attributes": {
+          "type": "array",
+          "description": "List of attribute definitions for this vertex type.",
+          "items": { "$ref": "#/definitions/AttributeDef" }
+        },
+        "sample": {
+          "type": ["object", "null"],
+          "description": "An optional example instance of this vertex type for LLM context.",
+          "additionalProperties": true,
+          "default": null
+        }
+      },
+      "required": ["type", "count", "primary_key", "attributes", "sample"]
+    },
+    "RelationshipType": {
+      "type": "object",
+      "description": "An edge type with its source/target vertex types and instance count.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Edge type / label name."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source vertex type for this edge."
+        },
+        "target": {
+          "type": "string",
+          "description": "Target vertex type for this edge."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of instances of this edge type."
+        },
+        "attributes": {
+          "type": "array",
+          "description": "List of attribute definitions for this edge type.",
+          "items": { "$ref": "#/definitions/AttributeDef" }
+        }
+      },
+      "required": ["type", "source", "target", "count", "attributes"]
+    },
+    "AttributeDef": {
+      "type": "object",
+      "description": "A single attribute definition.",
+      "properties": {
+        "name": { "type": "string", "description": "Attribute name." },
+        "type": { "type": "string", "description": "Attribute data type (e.g., STRING, INT, FLOAT, DATETIME)." },
+        "nullable": {
+          "type": "boolean",
+          "description": "Whether the attribute may be null.",
+          "default": false
+        }
+      },
+      "required": ["name", "type"]
+    },
+    "GraphStatistics": {
+      "type": "object",
+      "description": "Graph-level statistics.",
+      "properties": {
+        "total_vertices": {
+          "type": "integer",
+          "description": "Total number of vertices across all types."
+        },
+        "total_edges": {
+          "type": "integer",
+          "description": "Total number of edges across all types."
+        },
+        "avg_degree": {
+          "type": "number",
+          "description": "Average degree of vertices in the graph."
+        },
+        "connected_components": {
+          "type": "integer",
+          "description": "Number of connected components in the graph."
+        }
+      },
+      "required": ["total_vertices", "total_edges", "avg_degree", "connected_components"]
+    }
+  }
+}
