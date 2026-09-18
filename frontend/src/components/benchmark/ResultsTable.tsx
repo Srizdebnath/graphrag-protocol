@@ -104,9 +104,13 @@ export default function ResultsTable({ results }: ResultsTableProps) {
                   {r.pipeline_3.latency_ms.toFixed(0)}ms
                 </td>
                 <td className="px-3 py-2">
-                  <Badge color={r.evaluation.judge_pass ? "green" : "red"}>
-                    {r.evaluation.judge_pass ? "PASS" : "FAIL"}
-                  </Badge>
+                  {r.evaluation.judge_pass === null ? (
+                    <Badge color="gray">NOT EVALUATED</Badge>
+                  ) : (
+                    <Badge color={r.evaluation.judge_pass ? "green" : "red"}>
+                      {r.evaluation.judge_pass ? "PASS" : "FAIL"}
+                    </Badge>
+                  )}
                 </td>
               </tr>
             ))}

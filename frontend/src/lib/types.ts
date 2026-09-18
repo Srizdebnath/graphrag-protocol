@@ -119,6 +119,8 @@ export interface GraphSchema {
 export interface PipelineResult {
   answer: string;
   tokens_total: number;
+  /** How the answer was produced: "llm" or "extraction_only". */
+  answer_source?: string;
   token_breakdown?: {
     input_tokens: number;
     output_tokens: number;
@@ -133,9 +135,9 @@ export interface PipelineResult {
 }
 
 export interface Evaluation {
-  judge_pass: boolean;
-  judge_reason: string;
-  bertscore_f1: number;
+  judge_pass: boolean | null;
+  judge_reason: string | null;
+  bertscore_f1: number | null;
 }
 
 export interface BenchmarkResult {

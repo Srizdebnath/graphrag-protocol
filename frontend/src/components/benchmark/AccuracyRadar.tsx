@@ -36,11 +36,16 @@ export default function AccuracyRadar({ results }: AccuracyRadarProps) {
 
     const n = results.length;
 
-    const avgAccuracy = [
-      results.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / n,
-      results.reduce((s, r) => s + (r.evaluation.bertscore_f1 * 100), 0) / n,
-      results.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / n,
-    ];
+    const evaluated = results.filter((r) => r.evaluation.judge_pass !== null);
+    const nEval = evaluated.length;
+
+    const avgAccuracy = nEval
+      ? [
+          evaluated.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / nEval,
+          evaluated.reduce((s, r) => s + (r.evaluation.bertscore_f1 ?? 0) * 100, 0) / nEval,
+          evaluated.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / nEval,
+        ]
+      : [0, 0, 0];
 
     const avgTokens = [
       results.reduce((s, r) => s + r.pipeline_1.tokens_total, 0) / n,

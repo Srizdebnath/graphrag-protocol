@@ -23,8 +23,11 @@ export default function MetricsSummary({ results }: MetricsSummaryProps) {
       -1;
     const avgLatency =
       results.reduce((acc, r) => acc + r.pipeline_3.latency_ms, 0) / total;
-    const judgePasses = results.filter((r) => r.evaluation.judge_pass).length;
-    const judgePassRate = (judgePasses / total) * 100;
+    const evaluated = results.filter((r) => r.evaluation.judge_pass !== null);
+    const judgePasses = evaluated.filter((r) => r.evaluation.judge_pass).length;
+    const judgePassRate = evaluated.length
+      ? (judgePasses / evaluated.length) * 100
+      : 0;
 
     return {
       total,
