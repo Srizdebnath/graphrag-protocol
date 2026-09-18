@@ -8,9 +8,7 @@ Usage:
 
 import argparse
 import json
-import os
 import re
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -144,7 +142,7 @@ def main():
 
     categories = [c.strip() for c in args.categories.split(",")]
     search_query = build_search_query(categories)
-    print(f"=== arXiv Paper Fetcher ===")
+    print("=== arXiv Paper Fetcher ===")
     print(f"Categories: {categories}")
     print(f"Search query: {search_query}")
     print(f"Target count: {args.count}")
@@ -164,14 +162,14 @@ def main():
         print(f"Page {page_idx + 1}/{total_pages} (start={start}, fetched so far: {len(all_papers)})")
         try:
             papers = fetch_page(search_query, start, min(PAGE_SIZE, remaining))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - keep batch going on ANY fetch failure
             msg = f"Page {page_idx + 1} failed: {e}"
             print(f"  [ERROR] {msg}")
             failures.append(msg)
             break
 
         if not papers:
-            print(f"  No papers returned, stopping.")
+            print("  No papers returned, stopping.")
             break
 
         new_count = 0
@@ -196,8 +194,7 @@ def main():
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
-        for paper in all_papers.values():
-            f.write(json.dumps(paper, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(paper, ensure_ascii=False) + "\n" for paper in all_papers.values())
 
     # Category breakdown
     cat_breakdown: dict[str, int] = {}
@@ -218,7 +215,7 @@ def main():
         json.dump(stats, f, indent=2)
 
     print()
-    print(f"=== Summary ===")
+    print("=== Summary ===")
     print(f"Papers fetched:   {args.count} requested")
     print(f"Papers saved:     {len(all_papers)} (deduped by id)")
     print(f"Total abstract tokens: {total_tokens}")
