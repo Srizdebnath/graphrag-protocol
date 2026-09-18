@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "graphrag-protocol": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "mcp_server.mcp_server"],
+      "env": {
+        "PYTHONPATH": ".",
+        "TIGERGRAPH_HOST": "${TIGERGRAPH_HOST}",
+        "TIGERGRAPH_GSQL_SECRET": "${TIGERGRAPH_GSQL_SECRET}",
+        "TIGERGRAPH_GRAPH_NAME": "${TIGERGRAPH_GRAPH_NAME}",
+        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}"
+        ,"LLM_MODEL": "${LLM_MODEL}"
+      }
+    }
+  }
+}
