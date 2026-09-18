@@ -105,17 +105,21 @@ def _tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-def _answer(question: str, context_text: str, *, style: str) -> tuple[str, str]:
-    """Generate one pipeline's answer. Returns (answer, answer_source).
+def _answer(question: str, context_text: str, *, style: str) -> tuple[str, str, str | None]:
+    """Generate one pipeline's answer. Returns (answer, answer_source, model_used).
 
     style: 'llm_only' prompts without retrieved context; 'rag'/'graphrag'
-    prompt with their respective context. Falls back to a clearly-labeled
-    extractive answer when no LLM is configured (never fabricates).
+    prompt with their respective context. Primary model is retried 3x with
+    backoff (503 overload / transient 429); if ``LLM_FALLBACK_MODEL`` is set,
+    it is tried once more on hard failure (e.g. daily quota exhausted on a
+    new 3.x model). Falls back to a clearly-labeled extractive answer when
+    no LLM succeeds (never fabricates).
     """
+    fallback_model = os.environ.get("LLM_FALLBACK_MODEL") or None
     client = _llm()
     if client is None:
         snippet = " ".join(context_text.split())[:400] if context_text else "(no retrieval configured)"
-        return (f"[extraction_only — no LLM configured] {snippet}", "extraction_only")
+        return (f"[extraction_only — no LLM configured] {snippet}", "extraction_only", None)
     if style == "llm_only":
         prompt = f"Answer the question from your own knowledge. Be concise.\n\nQuestion: {question}"
     else:
@@ -125,11 +129,31 @@ def _answer(question: str, context_text: str, *, style: str) -> tuple[str, str]:
             f"Context:\n{context_text}\n\nQuestion: {question}"
         )
     try:
-        resp = client.models.generate_content(model=_LLM_MODEL, contents=prompt)
-        return (resp.text or "").strip() or "(empty LLM response)", "llm"
+        # New Gemini 3.x models intermittently return 503 UNAVAILABLE under
+        # high demand, and free tier caps e.g. gemini-3.8-flash at 20 req/day.
+        resp = None
+        model_used = _LLM_MODEL
+        for attempt in range(3):
+            try:
+                resp = client.models.generate_content(model=model_used, contents=prompt)
+                break
+            except Exception as retry_exc:  # noqa: BLE001 - 503/429 are transient
+                if attempt == 2 and fallback_model:
+                    model_used = fallback_model
+                    resp = client.models.generate_content(model=model_used, contents=prompt)
+                    break
+                if attempt == 2:
+                    raise
+                print(f"[server] LLM attempt {attempt + 1} failed ({type(retry_exc).__name__}); retrying")
+                time.sleep(2 * (attempt + 1))
+        return (resp.text or "").strip() or "(empty LLM response)", "llm", model_used
     except Exception as exc:  # noqa: BLE001 - degrade, never 500
         snippet = " ".join(context_text.split())[:400] if context_text else "(no retrieval)"
-        return (f"[llm_error: {type(exc).__name__}; extraction_only fallback] {snippet}", "extraction_only")
+        return (
+            f"[llm_error: {type(exc).__name__}; extraction_only fallback] {snippet}",
+            "extraction_only",
+            None,
+        )
 
 
 def _pipeline(
@@ -141,7 +165,7 @@ def _pipeline(
     style: str,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
-    answer, source = _answer(question, context_text, style=style)
+    answer, source, model_used = _answer(question, context_text, style=style)
     latency_ms = (time.perf_counter() - t0) * 1000
     # Honest token accounting: tokens actually sent as prompt input.
     # pipeline_1 (LLM-only) = question only; pipelines 2/3 = context + question.
@@ -154,7 +178,7 @@ def _pipeline(
         "retrieval_method": "none" if ctx is None else ctx.operation,
         "tokens_total": tokens_total,
         "latency_ms": round(latency_ms, 1),
-        "model": None if source == "extraction_only" else _LLM_MODEL,
+        "model": model_used,
     }
     if ctx is not None:
         out["entities_used"] = ctx.metrics.entities_returned

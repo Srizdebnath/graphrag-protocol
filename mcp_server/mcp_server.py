@@ -381,7 +381,7 @@ def build_server() -> MCPServer:
             {
                 "protocol": "graphrag/1.0",
                 "backend_requested": "tigergraph" if os.environ.get("TIGERGRAPH_HOST") else "demo",
-                "llm_model": os.environ.get("LLM_MODEL", "gemini-2.5-flash"),
+                "llm_model": os.environ.get("LLM_MODEL", "gemini-3.8-flash"),
                 "max_tokens_default": _DEFAULT_MAX_TOKENS,
             }
         )

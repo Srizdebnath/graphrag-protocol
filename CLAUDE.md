@@ -107,9 +107,9 @@ mypy mcp_server/
 # Frontend
 cd frontend && npm install && npm run dev
 
-# Hackathon data/eval scripts (need live .env)
+# Hackathon data scripts (need live .env; no evaluate.py exists — evaluation
+# currently runs via the demo server's /benchmark/results endpoint)
 .venv/bin/python hackathon/scripts/check_kg.py
-.venv/bin/python hackathon/scripts/evaluate.py
 ```
 
 MCP client config (e.g. Claude Desktop / Claude Code):
@@ -158,10 +158,13 @@ is the MCP framing channel).
 
 ## 5. Key implementation notes & gotchas
 
-- **Env truth:** `LLM_MODEL=gemini-2.5-flash` (same model across all three
-  pipelines — hackathon rule). Embeddings: `EMBED_MODEL=gemini-embedding-001`,
-  `EMBED_DIM=512`. Valid Google model ids only — the live API rejects
-  nonexistent names like `gemini-3.8-flash`.
+- **Env truth:** `LLM_MODEL=gemini-3.8-flash` (same model across all three
+  pipelines — hackathon rule; verified to exist via `client.models.list()`).
+  New 3.x models intermittently return **503 UNAVAILABLE under high demand** —
+  the demo server retries 3× with backoff, then serves a labeled
+  `extraction_only` answer. Embeddings: `EMBED_MODEL=gemini-embedding-001`,
+  `EMBED_DIM=512`. Never assume a model name is invalid — list the catalog
+  first.
 - **TigerGraph:** queries are installed idempotently (`CREATE OR REPLACE`)
   on first use; first call in a fresh workspace pays GSQL compilation cost
   (tens of seconds). Edge types are `AUTHORED_BY`, `MENTIONS`, `CITES`.
