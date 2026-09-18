@@ -26,18 +26,26 @@ classifiers = [
 ]
 
 dependencies = [
+    # Core protocol: models + contracts only. Serving/adapters are extras so
+    # the protocol core installs light (see README "Installation").
     "pydantic>=2",
-    "mcp",
-    "pyTigerGraph",
-    "google-genai",
     "python-dotenv",
-    "fastapi",
-    "uvicorn",
-    "click",
-    "httpx",
 ]
 
 [project.optional-dependencies]
+server = [
+    # HTTP demo server (FastAPI) + MCP stdio server (mcp SDK)
+    "fastapi",
+    "uvicorn",
+    "mcp>=2",
+    "httpx",
+]
+tigergraph = [
+    "pyTigerGraph",
+]
+llm = [
+    "google-genai",
+]
 dev = [
     "pytest",
     "ruff",
@@ -45,13 +53,15 @@ dev = [
 ]
 rag = [
     "chromadb",
-    "bert-score",
 ]
 eval = [
     "bert-score",
 ]
 
 [project.scripts]
+# Real MCP server (stdio) — expose the protocol contracts as MCP tools
+graphrag-mcp = "mcp_server.mcp_server:main"
+# HTTP demo/dashboard server (FastAPI)
 graphrag-server = "mcp_server.server:main"
 
 [tool.setuptools.packages.find]
@@ -59,10 +69,25 @@ include = ["mcp_server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Default run is fast and hermetic: live-backend tests are marked
+# `integration` (and additionally skip themselves when creds are absent).
+# Run them explicitly with:  pytest -m integration
+addopts = "-m 'not integration'"
+markers = [
+    "integration: tests that hit a live backend (TigerGraph/LLM). Deselect with -m 'not integration'.",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pyTigerGraph.*",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+# TigerGraph adapter intentionally swallows backend errors everywhere so every
+# operation degrades gracefully (empty-but-valid context) instead of crashing.
+"mcp_server/adapters/tigergraph_adapter.py" = ["BLE001", "S110", "S112"]
 
 [tool.mypy]
 python_version = "3.10"
