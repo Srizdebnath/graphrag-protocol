@@ -1,139 +1,222 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents (and humans) working in this repository.
+Last validated against the code on the `dev` branch — if this file and the
+code disagree, **the code wins**; fix this file in the same commit.
 
-## Project Overview
+## 0. Non-negotiables
 
-**GraphRAG Protocol** — a backend-agnostic protocol for talking to any GraphRAG system through 10 standardized contracts (see `SPEC.md`). One MCP server + one HTTP server expose the same contracts over different transports; adapters translate the protocol to concrete backends (TigerGraph live, in-memory demo for degradation).
+1. **Zero-Mock Policy.** No placeholder/stub/fake/mock implementations of any
+   protocol contract, retrieval operation, server endpoint, or benchmark
+   number. Every feature must run against a real backend (TigerGraph, or the
+   clearly-labeled in-memory demo adapter for local development) and produce
+   real measured output. A feature that cannot run yet is listed as "not
+   implemented" in this file — it is never faked.
+2. **Never fabricate.** No invented answers, scores, latencies, token counts,
+   or evaluation results. If the LLM is unavailable, responses are labeled
+   `extraction_only`. If evaluation has not run, metrics are `null`. Every
+   answer carries `answer_source` / provenance so an auditor can tell.
+3. **Secrets never enter git.** `.env` is git-ignored; only `.env.example`
+   (empty values) is tracked. If a secret ever lands in the history, rotate
+   it immediately and see `SECURITY.md`.
+4. **Degrade, never crash, never lie.** Backend unavailable → demo adapter +
+   honest labeling. LLM error → labeled fallback. Query error → empty but
+   valid `SubgraphContext` with `metrics.degradation_note` set.
+5. **Contracts are the API.** All retrieval goes through
+   `mcp_server/contracts/` (validation + normalization), all responses are
+   `mcp_server/protocol.py` models. Do not bypass the contracts layer.
 
-**Current state (P0 complete, verified against the live backend):**
+## 1. What this repository is
 
-- Real MCP stdio server (`mcp_server.mcp_server`) exposing **20 tools** backed by the contracts layer — verified end-to-end with a real MCP client handshake (list_tools → call_tool → live TigerGraph stats: ~49.6k vertices / ~79k edges).
-- Real HTTP demo server (`mcp_server.server`) running the 3-pipeline hackathon comparison with real retrieval and real Gemini answers; `extraction_only` labeling when no LLM key is set; `null` eval fields until a real eval harness runs.
-- TigerGraph adapter is real (pyTigerGraph + compiled GSQL, idempotent `CREATE OR REPLACE` installs, degradation fallbacks). `test_tigergraph_adapter.py` hits the live backend when creds exist (marked `integration`).
-- No mocks in the retrieval path. The only intentionally synthetic component is `DemoGraphRAGAdapter` (in-memory fallback for zero-config runs) — it is clearly labeled and used only when TigerGraph is unconfigured/unhealthy.
+An implementation of the **GraphRAG Interoperability Protocol** (see
+`SPEC.md`): a backend-agnostic contract layer so that any agent (MCP client,
+LangGraph, CrewAI, custom) can query any GraphRAG backend through one
+uniform interface with mandatory provenance.
 
-## Commands
+- `mcp_server/protocol.py` — Pydantic models for all 10 contracts
+  (`SubgraphContext`, `GraphSchema`, `Provenance`, `RetrievalMetrics`, …).
+- `mcp_server/contracts/` — the contract layer (validation, defaults,
+  auto-routing, normalization) over any adapter.
+- `mcp_server/adapters/` — backend adapters implementing
+  `BaseGraphRAGAdapter` (TigerGraph = real cloud backend; Demo = in-memory
+  reference for tests/offline dev).
+- `mcp_server/mcp_server.py` — **MCP server** (17 tools, stdio) — the
+  protocol surface for AI agents.
+- `mcp_server/server.py` — **HTTP demo server** (FastAPI) for the Next.js
+  dashboard: 3-pipeline comparison + benchmark + schema/visualize.
+- `mcp_server/formatters/` — Contract 8: token-bounded Markdown / structured
+  serialization of a `SubgraphContext` for LLM prompts.
+- `frontend/` — Next.js 15 dashboard (query lab, graph viz, benchmark).
+- `hackathon/` — TigerGraph-specific: dataset generation, GSQL loaders,
+  evaluation harness, static demo data.
+- `schemas/` — JSON Schema files for the wire contracts.
+- `tests/` — pytest suite (unit + `integration`-marked live-backend tests).
+
+The hackathon context: a TigerGraph Cloud workspace (`GraphragProtocol`
+graph, Paper/Author/Concept vertices, ~50k vertices / ~79k edges) loaded
+from arXiv metadata, with embeddings via `gemini-embedding-001`.
+
+## 2. Verified current state (what actually exists and runs)
+
+| Component | Status | Notes |
+|---|---|---|
+| Protocol models (10 contracts) | **done** | `mcp_server/protocol.py`, Pydantic v2, exportable JSON Schema |
+| Retrieval contract (7 ops + auto-routing) | **done** | `contracts/retrieval.py`; `search(mode='auto')` classifies global/entity/hybrid |
+| Schema discovery contract | **done** | `contracts/schema_discovery.py` (TTL-cached) |
+| Provenance contract | **done** | `contracts/provenance.py` (trace, trajectory, sources, audit) |
+| Construction contract | **not implemented** | Document→KG ingestion does not exist; `IngestionConfig` is model-only |
+| Federation contract | **not implemented** | `FederationConfig` is model-only; no fan-out/merge code |
+| Streaming contract | **not implemented** | `StreamEvent` is model-only; no subscriptions |
+| Authorization contract | **not implemented** | `AccessPolicy` is model-only; servers enforce nothing yet |
+| Evaluation contract | **not implemented** | `EvaluationReport` is model-only; benchmark endpoints return measured pipeline metrics with `null` judge/bertscore fields |
+| TigerGraph adapter | **done, real** | pyTigerGraph REST++ + compiled GSQL (`CREATE OR REPLACE` install-once), Gemini embeddings w/ keyword degradation |
+| Demo adapter | **done** | In-memory reference adapter; clearly-labeled demo backend, never presented as TigerGraph |
+| MCP server | **done, real** | `mcp_server/mcp_server.py`; 17 tools over stdio (mcp SDK ≥2) — see §4 |
+| HTTP demo server | **done, real** | FastAPI: `/health /query /benchmark/results /schema /graph/visualize`; real retrieval + real Gemini answers, `answer_source` honesty field; CORS restricted to localhost:3000 |
+| Formatters (Contract 8) | **done** | Markdown + structured, token-budgeted |
+| Frontend | **done (demo)** | Next.js 15 + Recharts; types match the demo server contract (`judge_pass`/`bertscore_f1` nullable) |
+| Hackathon scripts | **done** | KG check, loaders, evaluation harness (needs live workspace) |
+| Tests | **50 unit passing** | 11 `integration`-marked tests skip without live creds; run all with `pytest -m integration` |
+
+Not implemented anywhere in this repo (do not assume otherwise):
+ingestion, federation, streaming, authorization enforcement, and a real
+evaluation harness output. The corresponding protocol *models* exist so the
+wire contract is stable for when they land.
+
+## 3. Commands
 
 ```bash
-# Setup (Python 3.14 venv at .venv already present in dev)
-pip install -e '.[dev,server,tigergraph,llm]'
-cp .env.example .env   # then fill TIGERGRAPH_* and GOOGLE_API_KEY
+# Environment (uv venv at .venv, Python 3.14)
+source .venv/bin/activate
+pip install -e '.[server,tigergraph,llm,dev]'   # or just `pip install -e .` for the core
 
-# Tests (default run is hermetic: no live backend, no network)
-pytest                                    # 50 tests, seconds
-pytest -m integration                     # live TigerGraph adapter tests (needs creds)
+# Tests (unit only, hermetic; integration tests self-skip without creds)
+pytest                       # default: -m 'not integration' (configured in pyproject)
+pytest -m integration        # live TigerGraph/LLM tests (requires .env creds)
 
-# Lint
+# Lint / types
 ruff check mcp_server/ hackathon/ tests/
+mypy mcp_server/
 
-# Run the MCP server (stdio — this is what MCP clients launch)
-graphrag-mcp                              # or: python -m mcp_server.mcp_server
+# MCP server (what MCP clients launch; stdio transport)
+.venv/bin/python -m mcp_server.mcp_server    # or `graphrag-mcp` once installed
 
-# Run the HTTP demo server (binds 127.0.0.1:8000 by default)
-graphrag-server                           # or: python -m mcp_server.server
+# HTTP demo server (dashboard backend; binds 127.0.0.1 by default)
+.venv/bin/python -m mcp_server.server        # or `graphrag-server`; DEMO_HOST/DEMO_PORT to override
 
-# Frontend (Next.js 15, http://localhost:3000)
-cd frontend && npm run build && npm run dev
+# Frontend
+cd frontend && npm install && npm run dev
+
+# Hackathon data/eval scripts (need live .env)
+.venv/bin/python hackathon/scripts/check_kg.py
+.venv/bin/python hackathon/scripts/evaluate.py
 ```
 
-## Architecture
+MCP client config (e.g. Claude Desktop / Claude Code):
 
-### Backend (`mcp_server/`)
-
+```json
+{
+  "mcpServers": {
+    "graphrag-protocol": {
+      "command": "/home/ansh/graphrag-protocol/.venv/bin/python",
+      "args": ["-m", "mcp_server.mcp_server"],
+      "env": { "TIGERGRAPH_HOST": "your-host.tgcloud.io", "TIGERGRAPH_GSQL_SECRET": "<secret>" }
+    }
+  }
+}
 ```
-mcp_server/
-├── protocol.py                 # Pydantic contract models (Contracts 1,2,3,5)
-│                               #   SubgraphContext, Provenance, RetrievalMetrics,
-│                               #   GraphSchema (vertex_types/edge_types!), EntityType(.type!)
-├── contracts/
-│   ├── retrieval.py            # Contract 1: 7 operations + auto-routing search()
-│   ├── schema_discovery.py     # Contract 3: cached introspection
-│   ├── provenance.py           # Contract 5: trace_citation / trajectory / audit
-│   └── construction.py         # Contract 4 (ingestion)
-├── adapters/
-│   ├── base.py                 # BaseGraphRAGAdapter ABC
-│   ├── tigergraph_adapter.py   # LIVE backend (pyTigerGraph, GSQL in tigergraph_queries.py)
-│   └── fallback_adapter.py     # DemoGraphRAGAdapter — in-memory degradation target
-├── formatters/                 # Contract 8: MarkdownFormatter / StructuredFormatter
-│                               #   (format_context(context, max_tokens) — token-bounded)
-├── mcp_server.py               # MCP stdio server — 20 tools (graphrag-mcp)
-└── server.py                   # FastAPI demo server (graphrag-server)
-```
+## 4. The MCP server (`mcp_server/mcp_server.py`)
 
-**Layering rule:** tools → contracts (`RetrievalContract`, ...) → adapters. Never call adapter methods from tools directly; the contracts own validation, defaults, and normalization into `SubgraphContext`.
+Built on the **mcp SDK v2** (`MCPServer` from `mcp.server.mcpserver`; the old
+`FastMCP` name no longer exists in v2 — don't reintroduce it). Stdio is the
+only transport enabled. Selection logic: TigerGraph if configured *and*
+healthy, else demo adapter; both go through the same contracts layer.
 
-### The two servers
-
-| | MCP server (`mcp_server/mcp_server.py`) | HTTP demo (`mcp_server/server.py`) |
+| Tool | Backed by | Purpose |
 |---|---|---|
-| Transport | stdio (JSON-RPC via `mcp` SDK v2) | FastAPI on `DEMO_HOST:DEMO_PORT` (default **127.0.0.1**:8000) |
-| Consumers | Claude Desktop/Code, LangGraph, CrewAI | Next.js dashboard (`frontend/`) |
-| Endpoints/tools | 20 `graphrag_*` tools | `/health` `/query` `/benchmark/results` `/schema` `/graph/visualize` |
-| Answers | raw protocol envelopes (optional `formatted`) | 3-pipeline comparison (see below) |
+| `graphrag_search` | RetrievalContract.search | auto-routing NL query (local/global/hybrid/entity) |
+| `graphrag_entity` | RetrievalContract.entity_lookup | entity by id/name + neighborhood |
+| `graphrag_path` | RetrievalContract.path_search | paths between two entities |
+| `graphrag_neighborhood` | RetrievalContract.neighborhood | depth-bounded expansion |
+| `graphrag_community` | RetrievalContract.community_members | community members + summary |
+| `graphrag_schema` | SchemaDiscoveryContract | full GraphSchema introspection |
+| `graphrag_entity_types` | SchemaDiscoveryContract | vertex types + counts |
+| `graphrag_relationship_types` | SchemaDiscoveryContract | edge types + endpoints |
+| `graphrag_sample` | SchemaDiscoveryContract | sample entities per type |
+| `graphrag_provenance` | ProvenanceContract.trace_citation | citation/audit chain |
+| `graphrag_trajectory` | ProvenanceContract.get_traversal_trajectory | replay traversal steps |
+| `graphrag_sources` | ProvenanceContract.get_source_documents | source docs per entity |
+| `graphrag_audit` | ProvenanceContract.audit_provenance_completeness | cited-vs-examined score |
+| `graphrag_format` | Contract 8 formatters | re-format an envelope to Markdown/structured text |
+| `graphrag_status` | adapter.health_check + stats | backend identity + graph stats |
+| `graphrag_config` | env | non-secret effective config |
+| `graphrag_list_backends` | adapters | available + active backend |
 
-**Adapter selection (both servers):** try `TigerGraphAdapter.health_check()`; on failure/absent creds log to **stderr** and use `DemoGraphRAGAdapter`. Never print to stdout inside MCP tool code — stdout is the MCP framing channel.
+Rules for tools: thin wrappers over contracts (no business logic), args via
+type hints, return JSON strings, never print to stdout (stderr only — stdout
+is the MCP framing channel).
 
-### The 20 MCP tools
+## 5. Key implementation notes & gotchas
 
-Retrieval (8): `graphrag_search` (auto-routes local/global/hybrid/entity), `graphrag_local_search`, `graphrag_global_search`, `graphrag_hybrid_search`, `graphrag_entity`, `graphrag_path`, `graphrag_neighborhood`, `graphrag_community`.
+- **Env truth:** `LLM_MODEL=gemini-2.5-flash` (same model across all three
+  pipelines — hackathon rule). Embeddings: `EMBED_MODEL=gemini-embedding-001`,
+  `EMBED_DIM=512`. Valid Google model ids only — the live API rejects
+  nonexistent names like `gemini-3.8-flash`.
+- **TigerGraph:** queries are installed idempotently (`CREATE OR REPLACE`)
+  on first use; first call in a fresh workspace pays GSQL compilation cost
+  (tens of seconds). Edge types are `AUTHORED_BY`, `MENTIONS`, `CITES`.
+- **Vector status caveat:** TigerGraph's `/vector/status` endpoint can report
+  an attribute as NOT indexed even when `show index` confirms it is (seen on
+  `PaperEmb`); treat it as advisory only, and trust actual query behavior.
+- **Backend selection happens twice** (MCP server and demo server are
+  separate processes with their own `_adapter()`); they can theoretically
+  disagree if health flips between launches.
+- **Secrets hygiene:** use `git ls-files | grep -iE '\.env|secret|key|pem'`
+  before committing anything env-shaped. `.env.example` must stay value-empty.
+- **TLS:** verification is on everywhere; `TIGERGRAPH_TLS_VERIFY=false` exists
+  only as an explicit escape hatch in `check_kg.py` for broken cert chains.
 
-Schema (4): `graphrag_schema`, `graphrag_entity_types`, `graphrag_relationship_types`, `graphrag_sample`.
+## 6. Honest-behavior ledger (mock vs real vs degraded)
 
-Provenance (4): `graphrag_provenance`, `graphrag_trajectory`, `graphrag_sources`, `graphrag_audit`.
+| Surface | Real when | Degraded behavior (labeled) |
+|---|---|---|
+| TigerGraph retrieval | creds present + workspace healthy | demo adapter (in-memory) |
+| Hybrid search embeddings | `GOOGLE_API_KEY` set | keyword-only graph search |
+| Demo-server answers | `GOOGLE_API_KEY` set | `answer_source: extraction_only` |
+| Benchmark judge/bertscore | eval harness run | `null` fields (never invented) |
+| Demo adapter | local dev/tests | always labeled `demo` |
 
-Formatting (1): `graphrag_format` — reformat a returned `SubgraphContext` envelope to token-bounded Markdown/structured text (`format_text`: none|markdown|structured; `max_tokens`).
+Any new feature must land in this table.
 
-Admin (3): `graphrag_status`, `graphrag_config` (non-secret config only), `graphrag_list_backends`. Tool functions return `json.dumps(...)` strings; every retrieval payload is the full protocol envelope `{protocol, operation, query, results, provenance, metrics[, formatted]}`.
+## 7. Git conventions
 
-### The 3-pipeline hackathon comparison (`/query`)
+- Branch: `dev` is the working branch (default); PRs `dev → main` for
+  milestones. Never commit straight to `main`.
+- Commit style: Conventional Commits —
+  `feat(mcp): add provenance audit tool`, `fix(server): bind demo server to
+  localhost`, `docs: align CLAUDE.md with code`, `chore(deps): ...`,
+  `security: ...`. Subject ≤ 72 chars, imperative mood.
+- One logical change per commit; run `ruff check` + `pytest` before pushing.
+- Keep `CLAUDE.md`, `README.md`, and `SPEC.md` aligned with reality in the
+  same PR that changes behavior.
 
-1. `pipeline_1_llm_only` — Gemini, no retrieval.
-2. `pipeline_2_basic_rag` — `local_search(top_k=5, depth=1)` context → Gemini.
-3. `pipeline_3_graphrag` — `search(mode=auto)` graph-aware context → Gemini.
+## 8. When touching a module, read first
 
-Each response carries honest, measured fields: `tokens_total` (actual prompt chars/4), `latency_ms` (generation wall time), `retrieval_method`, `answer_source` (`llm` or `extraction_only`), `model` (null for extraction-only), plus provenance for pipelines 2/3. `/benchmark/results` runs real queries from `hackathon/data/queries/` through the same pipelines and reports `evaluation.judge_pass / bertscore_f1` as **null** until the real eval harness (P1) exists — the dashboard renders these as "N/A" / 0%.
+- `mcp_server/protocol.py` — before ANY change to models/wire shapes; keep
+  the JSON Schemas in `schemas/` and `frontend/src/lib/types.ts` in sync.
+- `mcp_server/adapters/tigergraph_queries.py` — before changing GSQL; the
+  adapter maps its outputs by output key name, so renames break silently.
+- `mcp_server/contracts/retrieval.py` — before adding an operation; also add
+  the MCP tool + this file's §4 row in the same commit.
+- `frontend/src/lib/api.ts` — endpoint contract with the demo server.
+- `.env.example` — any new env var, documented and value-empty.
 
-## Environment variables
+## 9. Definition of done (for any new feature)
 
-Copy `.env.example` → `.env`. Never commit real values.
-
-| Var | Notes |
-|---|---|
-| `TIGERGRAPH_HOST/PORT/USERNAME/GSQL_SECRET/GRAPH_NAME/WORKSPACE_ID` | Savanna cloud workspace. **The GSQL secret was leaked in git history once — rotate it in the Savanna console** (DB admins → secrets). |
-| `GOOGLE_API_KEY`, `LLM_MODEL` | Hackathon rule: the SAME model across all pipelines. Valid IDs: `gemini-2.5-flash`, `gemini-2.5-pro` (no `gemini-3.8-flash`). |
-| `EMBED_MODEL`, `EMBED_DIM` | TigerGraph vector attributes: `gemini-embedding-001`, dim 512. |
-| `DEMO_HOST`, `DEMO_PORT` | HTTP bind; defaults `127.0.0.1:8000`. Do not expose 0.0.0.0 without auth. |
-| `TIGERGRAPH_TLS_VERIFY` | Only set `false` for known-broken cert chains (corporate proxies). |
-
-CORS on the demo server is restricted to `localhost:3000` origins.
-
-## Testing
-
-- Default `pytest` is **hermetic**: the TigerGraph test module is marked `integration` (deselected by `addopts` in `pyproject.toml`) and self-skips without creds.
-- MCP tests (`tests/test_mcp_server.py`) seed `mcp_server.mcp_server.STATE` with `DemoGraphRAGAdapter` and exercise tools through `MCPServer.call_tool` — no network.
-- HTTP tests (`tests/test_server.py`) monkeypatch `mcp_server.server._ADAPTER`/`_RETRIEVAL`/`_LLM_AVAILABLE=False` and assert honest labeling (`extraction_only`, null evals).
-- Live smoke (validated 2026-09-18): a minimal MCP client — `mcp.client.stdio.stdio_client` launching `python -m mcp_server.mcp_server` (see `.mcp.json` for the same launch config) — initializes, lists 20 tools, and `graphrag_status` returns live TigerGraph stats.
-
-## Critical domain knowledge & gotchas
-
-- **`mcp` SDK is v2**: `FastMCP` was renamed — import `MCPServer` from `mcp.server.mcpserver`; `mcp.types` field names are snake_case (`server_info`, not `serverInfo`). Don't pin `mcp<2`.
-- **Python protocol field names differ from SPEC.md/TS**: `GraphSchema` uses `vertex_types`/`edge_types` (TS uses `entity_types`/`relationship_types`); `EntityType` key field is `.type` (not `.name`); `Provenance` has `source_documents/traversal_log/visited_not_cited/...` (no `completeness_score` field — completeness is computed by `ProvenanceContract.audit_provenance_completeness`); `GraphStatistics` reports `avg_degree`/`connected_components`. The Next.js `lib/types.ts` mirrors the SPEC/JSON-schema shape; the demo server bridges where needed.
-- **Contract auto-routing**: `RetrievalContract.search()` classifies the query then dispatches; per-operation kwargs are filtered (e.g. `top_k` is dropped for `entity` mode). Fix added 2026-09-18 — keep the filtering when adding new operations.
-- **TigerGraph queries** live in `mcp_server/adapters/tigergraph_queries.py` and install idempotently on first use. Vector readiness is polled (`PaperEmb` populated or not); without it `hybrid_search` degrades to keyword+graph.
-- **Write diagnostics to stderr** in both servers. MCP stdout must stay framing-clean.
-- **Demo adapter ids**: `paper:attention`, `paper:bert`, `concept:transformer` — used by tests and zero-config runs.
-- **Hackathon scoring**: same LLM everywhere; latency/tokens are measured, never invented; the `evaluation` fields of `/benchmark/results` are intentional nulls until the real eval harness (P1) exists — do not fabricate judge/bertscore values.
-
-## Security posture ( enforced )
-
-- `.env` is git-ignored (verify: `git check-ignore .env` → exits 0). `.env.example` contains placeholders only.
-- Demo server binds localhost; CORS pinned to dev origins; request bodies are size- and pattern-validated (Pydantic).
-- TLS verification stays on by default everywhere (`TIGERGRAPH_TLS_VERIFY` escape hatch documented).
-- No secrets in tool output: `graphrag_config` exposes non-secret config only.
-
-## Roadmap
-
-- **P0 (done)**: real MCP server (20 tools), honest HTTP server, secret scrub, packaging extras, hermetic test suite, contract auto-routing bugfix, localhost/CORS/TLS hardening, `verify=False` removed.
-- **P1 (next)**: real evaluation harness (SPEC Contract 9): run all 50 hackathon queries × 3 pipelines through Gemini judge + BERTScore (`pip install -e '.[eval]'`), persist to `hackathon/results/`, feed `/benchmark/results` and the dashboard with real numbers instead of nulls.
-- **P2 (later)**: additional adapters (Neo4j, LightRAG) implementing `BaseGraphRAGAdapter`; Contracts 6/7/10 (federation, streaming, authorization); composite/registry pattern for multi-backend fan-out.
+1. Implemented against a real backend path (no `NotImplementedError`, no
+   hard-coded outputs, no TODO placeholders).
+2. Contract-layered (validation + normalization), provenance attached.
+3. Unit tests added; live-backend coverage marked `integration` and
+   self-skipping without creds.
+4. `ruff check` clean; `pytest` green.
+5. §2 table (and §4 if MCP) updated in the same commit.
