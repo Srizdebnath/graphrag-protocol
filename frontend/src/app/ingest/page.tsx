@@ -119,11 +119,11 @@ export default function IngestPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-          Document Ingestion & Live Mutation Feed
+        <h1 className="text-2xl font-black uppercase tracking-tight text-black">
+          Document Ingestion &amp; Live Mutation Feed
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Contract 4 (Construction) real writes into TigerGraph & Contract 7 (Streaming) live SSE bus.
+        <p className="mt-1 font-mono text-xs font-bold text-black/70">
+          Contract 4 (Construction) real writes into TigerGraph &amp; Contract 7 (Streaming) live SSE bus.
         </p>
       </div>
 
@@ -133,68 +133,68 @@ export default function IngestPage() {
           <Card title="Contract 4: Ingest Document" subtitle="Extracts concepts, resolves entities, and updates graph">
             <form onSubmit={handleIngest} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Document ID (arXiv ID)</label>
+                <label className="block font-mono text-xs font-black uppercase text-black">Document ID (arXiv ID)</label>
                 <input
                   type="text"
                   value={docId}
                   onChange={(e) => setDocId(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border-2 border-black bg-white px-3 py-2 font-mono text-sm shadow-brutal-xs focus:outline-none focus:shadow-brutal-sm transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Title</label>
+                <label className="block font-mono text-xs font-black uppercase text-black">Title</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border-2 border-black bg-white px-3 py-2 font-sans text-sm font-semibold shadow-brutal-xs focus:outline-none focus:shadow-brutal-sm transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Authors (comma-separated)</label>
+                <label className="block font-mono text-xs font-black uppercase text-black">Authors (comma-separated)</label>
                 <input
                   type="text"
                   value={authors}
                   onChange={(e) => setAuthors(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border-2 border-black bg-white px-3 py-2 font-sans text-sm font-semibold shadow-brutal-xs focus:outline-none focus:shadow-brutal-sm transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Text / Abstract</label>
+                <label className="block font-mono text-xs font-black uppercase text-black">Text / Abstract</label>
                 <textarea
                   rows={4}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-900 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border-2 border-black bg-white px-3 py-2 font-sans text-sm shadow-brutal-xs focus:outline-none focus:shadow-brutal-sm transition-all"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Admin Token (X-Admin-Token)</label>
+                <label className="block font-mono text-xs font-black uppercase text-black">Admin Token (X-Admin-Token)</label>
                 <input
                   type="password"
                   value={adminToken}
                   onChange={(e) => setAdminToken(e.target.value)}
                   placeholder="Set in .env as GRAPHRAG_ADMIN_TOKEN"
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-gray-900 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border-2 border-black bg-white px-3 py-2 font-mono text-sm shadow-brutal-xs focus:outline-none focus:shadow-brutal-sm transition-all"
                   required
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2 font-mono text-xs font-bold text-black cursor-pointer">
                   <input
                     type="checkbox"
                     checked={dryRun}
                     onChange={(e) => setDryRun(e.target.checked)}
-                    className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                    className="h-4 w-4 rounded border-2 border-black text-black focus:ring-0"
                   />
                   <span>Dry Run (simulate writes)</span>
                 </label>
@@ -203,7 +203,7 @@ export default function IngestPage() {
               <button
                 type="submit"
                 disabled={ingesting}
-                className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                className="w-full rounded-xl border-3 border-black bg-[#86EFAC] px-5 py-3 font-mono text-sm font-black uppercase tracking-wider text-black shadow-brutal hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-brutal-lg active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutal-sm disabled:opacity-50 transition-all"
               >
                 {ingesting ? "Ingesting..." : dryRun ? "Simulate Ingestion" : "Ingest into TigerGraph"}
               </button>
@@ -216,20 +216,20 @@ export default function IngestPage() {
             )}
 
             {ingestResult && (
-              <div className="mt-4 p-4 rounded-md bg-gray-50 border border-gray-200 space-y-2">
+              <div className="mt-4 rounded-xl border-2 border-black bg-[#FEF08A] p-4 shadow-brutal-sm space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-700">Ingestion Report</span>
+                  <span className="font-mono text-xs font-black uppercase tracking-wider text-black">Ingestion Report</span>
                   <Badge color={ingestResult.errors?.length ? "red" : "green"}>
                     {ingestResult.errors?.length ? "Errors Reported" : "Success"}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div>Documents Written: <span className="font-semibold text-gray-900">{ingestResult.documents_written?.length || 0}</span></div>
-                  <div>Entities Created: <span className="font-semibold text-gray-900">{ingestResult.entities_created}</span></div>
-                  <div>Entities Resolved: <span className="font-semibold text-gray-900">{ingestResult.entities_resolved}</span></div>
-                  <div>Edges Created: <span className="font-semibold text-gray-900">{ingestResult.relationships_created}</span></div>
-                  <div>Duration: <span className="font-semibold text-gray-900">{(ingestResult.duration_ms || 0).toFixed(1)}ms</span></div>
-                  <div>Triples: <span className="font-semibold text-gray-900">{ingestResult.triples?.length || 0}</span></div>
+                <div className="grid grid-cols-2 gap-2 font-mono text-xs text-black/80">
+                  <div>Documents Written: <span className="font-black text-black">{ingestResult.documents_written?.length || 0}</span></div>
+                  <div>Entities Created: <span className="font-black text-black">{ingestResult.entities_created}</span></div>
+                  <div>Entities Resolved: <span className="font-black text-black">{ingestResult.entities_resolved}</span></div>
+                  <div>Edges Created: <span className="font-black text-black">{ingestResult.relationships_created}</span></div>
+                  <div>Duration: <span className="font-black text-black">{(ingestResult.duration_ms || 0).toFixed(1)}ms</span></div>
+                  <div>Triples: <span className="font-black text-black">{ingestResult.triples?.length || 0}</span></div>
                 </div>
               </div>
             )}
@@ -242,25 +242,25 @@ export default function IngestPage() {
             title="Contract 7: Live Mutation Stream"
             subtitle="Real-time Server-Sent Events (SSE) from the graph event bus"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+            <div className="flex items-center justify-between pb-3 border-b-2 border-black">
               <div className="flex items-center gap-2">
                 <span
-                  className={`inline-block h-2.5 w-2.5 rounded-full ${
+                  className={`inline-block h-3 w-3 rounded-full border border-black ${
                     streamStatus === "connected"
-                      ? "bg-green-500 animate-pulse"
+                      ? "bg-[#4ADE80] animate-pulse"
                       : streamStatus === "connecting"
-                      ? "bg-amber-500 animate-pulse"
-                      : "bg-red-500"
+                      ? "bg-[#FACC15] animate-pulse"
+                      : "bg-[#F87171]"
                   }`}
                 />
-                <span className="text-xs font-medium text-gray-600 capitalize">{streamStatus}</span>
+                <span className="font-mono text-xs font-black uppercase text-black">{streamStatus}</span>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-500">Filter:</label>
+                <label className="font-mono text-xs font-black uppercase text-black/70">Filter:</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-gray-900 focus:outline-none"
+                  className="rounded-md border-2 border-black bg-white px-2 py-1 font-mono text-xs font-bold shadow-brutal-xs focus:outline-none"
                 >
                   <option value="">All Events</option>
                   <option value="entity_created">entity_created</option>
@@ -271,9 +271,9 @@ export default function IngestPage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto pr-2">
+            <div className="mt-4 space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {events.length === 0 ? (
-                <div className="py-12 text-center text-xs text-gray-400">
+                <div className="py-16 text-center font-mono text-xs font-bold uppercase tracking-wider text-black/50">
                   {streamStatus === "connected"
                     ? "Listening for graph mutation events... Trigger an ingestion on the left!"
                     : "Connecting to SSE stream..."}
@@ -282,15 +282,15 @@ export default function IngestPage() {
                 events.map((ev, idx) => (
                   <div
                     key={ev.event_id || idx}
-                    className="p-3 rounded-md border border-gray-200 bg-white hover:border-gray-300 transition-colors space-y-1.5"
+                    className="rounded-lg border-2 border-black bg-white p-3 shadow-brutal-xs hover:shadow-brutal-sm transition-all space-y-1.5"
                   >
                     <div className="flex items-center justify-between text-xs">
                       <Badge color="blue">{ev.event_type}</Badge>
-                      <span className="text-gray-400 font-mono text-[10px]">
+                      <span className="font-mono text-[10px] font-bold text-black/60">
                         {new Date(ev.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
-                    <pre className="text-[11px] font-mono text-gray-700 bg-gray-50 p-2 rounded overflow-x-auto">
+                    <pre className="rounded-md border-2 border-black/20 bg-yellow-50/50 p-2 font-mono text-[11px] text-black overflow-x-auto">
                       {JSON.stringify(ev.payload, null, 2)}
                     </pre>
                   </div>

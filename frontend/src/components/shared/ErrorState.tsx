@@ -5,15 +5,19 @@ interface ErrorStateProps {
 
 export default function ErrorState({ message, hint }: ErrorStateProps) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">
+    <div className="rounded-xl border-3 border-black bg-[#FDA4AF] p-5 shadow-brutal text-black">
+      <div className="flex items-start gap-3.5">
+        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-md border-2 border-black bg-black font-mono text-sm font-black text-[#FFE600] shadow-brutal-xs">
           !
         </span>
-        <div>
-          <p className="text-sm font-semibold text-red-800">Error</p>
-          <p className="mt-1 text-sm text-red-700">{message}</p>
-          {hint && <p className="mt-1 text-xs text-red-600">{hint}</p>}
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-xs font-black uppercase tracking-wider text-black">Execution Error</p>
+          <p className="mt-1 text-sm font-bold leading-snug text-black">{message}</p>
+          {hint && (
+            <p className="mt-2 inline-block rounded border-2 border-black bg-white px-2.5 py-1 font-mono text-xs font-semibold text-black shadow-brutal-xs">
+              Hint: {hint}
+            </p>
+          )}
         </div>
       </div>
     </div>

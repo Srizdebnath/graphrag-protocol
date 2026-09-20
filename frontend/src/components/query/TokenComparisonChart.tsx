@@ -46,13 +46,22 @@ export default function TokenComparisonChart({
     <Card title="Token Comparison" subtitle="Total and context tokens per pipeline">
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: -8 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="answer" name="Total tokens" fill="#3b82f6" />
-          <Bar dataKey="context" name="Context tokens" fill="#10b981" />
+          <CartesianGrid strokeDasharray="2 2" stroke="#000000" strokeOpacity={0.15} />
+          <XAxis dataKey="name" stroke="#000000" tick={{ fill: "#000000", fontWeight: 700, fontSize: 12 }} />
+          <YAxis stroke="#000000" tick={{ fill: "#000000", fontWeight: 600, fontSize: 11 }} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "#FFFFFF",
+              border: "3px solid #000000",
+              boxShadow: "4px 4px 0px 0px #000000",
+              borderRadius: "8px",
+              fontFamily: "monospace",
+              fontWeight: "bold",
+            }}
+          />
+          <Legend wrapperStyle={{ fontFamily: "monospace", fontWeight: "bold", fontSize: "12px", paddingTop: "8px" }} />
+          <Bar dataKey="answer" name="Total tokens" fill="#74B9FF" stroke="#000000" strokeWidth={2} />
+          <Bar dataKey="context" name="Context tokens" fill="#FFE600" stroke="#000000" strokeWidth={2} />
         </BarChart>
       </ResponsiveContainer>
     </Card>

@@ -47,41 +47,50 @@ export default function ProtocolPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="mb-2 text-xl font-bold text-gray-900">Protocol Explorer</h1>
-      <p className="mb-6 text-sm text-gray-500">Graph schema and the 10 protocol contracts.</p>
+    <div className="mx-auto max-w-7xl px-4 py-8 space-y-8">
+      <div>
+        <h1 className="text-2xl font-black uppercase tracking-tight text-black">Protocol Explorer</h1>
+        <p className="mt-1 font-mono text-xs font-bold text-black/70">
+          Introspect active TigerGraph schema, vertex/edge definitions, and 10 formal protocol contracts.
+        </p>
+      </div>
 
       {loading && <LoadingSpinner label="Fetching graph schema..." />}
       {error && <ErrorState message={error} hint="Make sure the backend server is running at http://localhost:8000" />}
 
       {!loading && !error && !schema && (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-16 text-center text-sm text-gray-400">
+        <div className="rounded-xl border-3 border-dashed border-black bg-white/70 py-16 text-center font-mono text-xs font-black uppercase tracking-wider text-black/60 shadow-brutal-sm">
           Schema not available. Backend may be unreachable.
         </div>
       )}
 
       {schema && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Statistics */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
-              { label: "Total Vertices", value: schema.statistics.total_vertices.toLocaleString() },
-              { label: "Total Edges", value: schema.statistics.total_edges.toLocaleString() },
+              { label: "Total Vertices", value: schema.statistics.total_vertices.toLocaleString(), bg: "bg-[#E0E7FF]" },
+              { label: "Total Edges", value: schema.statistics.total_edges.toLocaleString(), bg: "bg-[#DCFCE7]" },
               {
                 label: "Density / Avg Degree",
                 value: schema.statistics.density !== undefined
                   ? schema.statistics.density.toFixed(4)
                   : (schema.statistics.avg_degree ?? 0).toFixed(2),
+                bg: "bg-[#FEF08A]",
               },
               {
                 label: "Connected Components",
                 value: (schema.statistics.connected_components ?? schema.statistics.components ?? 0).toLocaleString(),
+                bg: "bg-[#FCE7F3]",
               },
             ].map((s) => (
-              <Card key={s.label}>
-                <p className="text-xs text-gray-500">{s.label}</p>
-                <p className="mt-1 text-xl font-bold text-gray-900">{s.value}</p>
-              </Card>
+              <div
+                key={s.label}
+                className={`rounded-xl border-3 border-black ${s.bg} p-4 shadow-brutal transition-transform hover:translate-x-[-2px] hover:translate-y-[-2px]`}
+              >
+                <p className="font-mono text-xs font-black uppercase tracking-wider text-black/70">{s.label}</p>
+                <p className="mt-1 font-mono text-2xl font-black text-black">{s.value}</p>
+              </div>
             ))}
           </div>
 
@@ -89,28 +98,28 @@ export default function ProtocolPage() {
           {(() => {
             const vtypes = schema.vertex_types || schema.entity_types || [];
             return (
-              <Card title="Vertex Types" subtitle={`${vtypes.length} types in the graph`}>
-                <div className="overflow-x-auto">
+              <Card title="Vertex Types" subtitle={`${vtypes.length} vertex types in active knowledge graph`}>
+                <div className="overflow-x-auto rounded-lg border-2 border-black shadow-brutal-sm">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200 bg-gray-50">
+                    <thead className="border-b-3 border-black bg-[#FFE600]">
                       <tr>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Attributes</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Type</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Count</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Attributes</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y-2 divide-black/10 bg-white font-mono text-xs">
                       {vtypes.map((et) => {
                         const typeName = et.type || et.name || "Unknown";
                         return (
-                          <tr key={typeName} className="hover:bg-gray-50/50">
-                            <td className="px-3 py-2 font-medium text-gray-900">{typeName}</td>
-                            <td className="px-3 py-2 text-gray-700">{(et.count || 0).toLocaleString()}</td>
-                            <td className="px-3 py-2">
+                          <tr key={typeName} className="hover:bg-yellow-50/80 transition-colors">
+                            <td className="px-3.5 py-2.5 font-bold text-black">{typeName}</td>
+                            <td className="px-3.5 py-2.5 font-bold text-black/80">{(et.count || 0).toLocaleString()}</td>
+                            <td className="px-3.5 py-2.5">
                               <div className="flex flex-wrap gap-1">
                                 {Object.entries(et.attributes || {}).map(([k, v]) => (
                                   <Badge key={k} color="gray">
-                                    {k}: {v}
+                                    {k}: {String(v)}
                                   </Badge>
                                 ))}
                               </div>
@@ -129,28 +138,28 @@ export default function ProtocolPage() {
           {(() => {
             const etypes = schema.edge_types || schema.relationship_types || [];
             return (
-              <Card title="Edge Types" subtitle={`${etypes.length} relationship types`}>
-                <div className="overflow-x-auto">
+              <Card title="Edge Types" subtitle={`${etypes.length} relationship types connecting entities`}>
+                <div className="overflow-x-auto rounded-lg border-2 border-black shadow-brutal-sm">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200 bg-gray-50">
+                    <thead className="border-b-3 border-black bg-[#FFE600]">
                       <tr>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Source → Target</th>
-                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Type</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Source → Target</th>
+                        <th className="px-3.5 py-3 font-mono text-xs font-black uppercase tracking-wider text-black">Count</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y-2 divide-black/10 bg-white font-mono text-xs">
                       {etypes.map((rt) => {
                         const typeName = rt.type || rt.name || "Unknown";
                         const src = rt.source_type || rt.source || "*";
                         const tgt = rt.target_type || rt.target || "*";
                         return (
-                          <tr key={typeName} className="hover:bg-gray-50/50">
-                            <td className="px-3 py-2 font-medium text-gray-900">{typeName}</td>
-                            <td className="px-3 py-2 text-gray-700">
-                              {src} → {tgt}
+                          <tr key={typeName} className="hover:bg-yellow-50/80 transition-colors">
+                            <td className="px-3.5 py-2.5 font-bold text-black">{typeName}</td>
+                            <td className="px-3.5 py-2.5 font-bold text-black/80">
+                              {src} &rarr; {tgt}
                             </td>
-                            <td className="px-3 py-2 text-gray-700">{(rt.count || 0).toLocaleString()}</td>
+                            <td className="px-3.5 py-2.5 font-bold text-black">{(rt.count || 0).toLocaleString()}</td>
                           </tr>
                         );
                       })}
@@ -164,20 +173,34 @@ export default function ProtocolPage() {
       )}
 
       {/* Contracts — always shown */}
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-bold text-gray-900">Protocol Contracts</h2>
+      <div className="space-y-4 pt-4">
+        <div>
+          <h2 className="text-xl font-black uppercase tracking-tight text-black">10 Protocol Wire Contracts</h2>
+          <p className="mt-0.5 font-mono text-xs font-bold text-black/70">
+            Formal JSON Schema specifications defining interoperability interfaces
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {CONTRACTS.map((c) => (
-            <Card key={c.id}>
-              <div className="flex items-start gap-3">
-                <Badge color="blue">{c.id}</Badge>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">{c.name}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-600">{c.description}</p>
+          {CONTRACTS.map((c, idx) => {
+            const colors = ["bg-[#E0E7FF]", "bg-[#FEF08A]", "bg-[#DCFCE7]", "bg-[#FCE7F3]", "bg-[#FED7AA]", "bg-[#CCFBF1]"];
+            const bg = colors[idx % colors.length];
+            return (
+              <div
+                key={c.id}
+                className={`rounded-xl border-3 border-black ${bg} p-5 shadow-brutal transition-transform hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-brutal-lg`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="rounded-md border-2 border-black bg-black px-2 py-0.5 font-mono text-xs font-black text-[#FFE600] shadow-brutal-xs">
+                    {c.id}
+                  </span>
+                  <div>
+                    <h3 className="font-mono text-sm font-black uppercase text-black">{c.name}</h3>
+                    <p className="mt-1 font-mono text-xs font-semibold leading-relaxed text-black/80">{c.description}</p>
+                  </div>
                 </div>
               </div>
-            </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

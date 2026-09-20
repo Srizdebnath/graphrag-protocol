@@ -4,9 +4,9 @@ interface LoadingSpinnerProps {
 
 export default function LoadingSpinner({ label = "Loading..." }: LoadingSpinnerProps) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
-      <p className="text-sm">{label}</p>
+    <div className="flex flex-col items-center justify-center gap-4 py-12">
+      <div className="h-10 w-10 animate-spin rounded-lg border-3 border-black bg-[#FFE600] shadow-brutal-sm" />
+      <p className="font-mono text-xs font-black uppercase tracking-wider text-black">{label}</p>
     </div>
   );
 }

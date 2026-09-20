@@ -51,11 +51,11 @@ export default function GraphPage() {
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col lg:flex-row">
+    <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row">
       {/* Graph panel */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 bg-[#F7F5EE]">
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#F7F5EE]">
             <LoadingSpinner label="Loading graph visualization..." />
           </div>
         )}
@@ -65,7 +65,7 @@ export default function GraphPage() {
           </div>
         )}
         {!loading && !error && nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+          <div className="absolute inset-0 flex items-center justify-center font-mono text-xs font-black uppercase tracking-wider text-black/50">
             No graph data available. The backend may be unreachable.
           </div>
         )}
@@ -75,7 +75,7 @@ export default function GraphPage() {
       </div>
 
       {/* Side panel */}
-      <div className="h-64 w-full border-t border-gray-200 bg-white lg:h-full lg:w-80 lg:border-t-0 lg:border-l">
+      <div className="h-72 w-full border-t-4 border-black bg-white shadow-brutal lg:h-full lg:w-96 lg:border-t-0 lg:border-l-4">
         <EntityDetails entity={selectedEntity} onClose={() => setSelectedEntity(null)} />
       </div>
     </div>

@@ -60,7 +60,7 @@ export default function ResultsTable({ results }: ResultsTableProps) {
     const arrow = sortKey === key ? (sortAsc ? " \u25B2" : " \u25BC") : "";
     return (
       <th
-        className="cursor-pointer select-none px-3 py-2 text-left text-xs font-semibold text-gray-600 hover:text-gray-900"
+        className="cursor-pointer select-none px-3.5 py-3 text-left font-mono text-xs font-black uppercase tracking-wider text-black hover:bg-yellow-400 transition-colors"
         onClick={() => toggle(key)}
       >
         {label}
@@ -70,10 +70,10 @@ export default function ResultsTable({ results }: ResultsTableProps) {
   }
 
   return (
-    <Card title="Results" subtitle={`${results.length} queries`}>
-      <div className="overflow-x-auto">
+    <Card title="Benchmark Execution Results" subtitle={`${results.length} total test queries evaluated`}>
+      <div className="overflow-x-auto rounded-lg border-2 border-black shadow-brutal-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50">
+          <thead className="border-b-3 border-black bg-[#FFE600]">
             <tr>
               {header("Query", "query")}
               {header("Category", "category")}
@@ -84,26 +84,26 @@ export default function ResultsTable({ results }: ResultsTableProps) {
               {header("Judge", "judge")}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y-2 divide-black/10 bg-white font-mono text-xs">
             {sorted.map((r) => (
-              <tr key={r.query_id} className="hover:bg-gray-50/50">
-                <td className="max-w-[260px] truncate px-3 py-2 text-gray-800">{r.query}</td>
-                <td className="px-3 py-2">
+              <tr key={r.query_id} className="hover:bg-yellow-50/80 transition-colors">
+                <td className="max-w-[260px] truncate px-3.5 py-2.5 font-bold text-black">{r.query}</td>
+                <td className="px-3.5 py-2.5">
                   <Badge color="blue">{r.category}</Badge>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-700">
+                <td className="px-3.5 py-2.5 font-bold text-black/80">
                   {r.pipeline_1.tokens_total.toLocaleString()}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-700">
+                <td className="px-3.5 py-2.5 font-bold text-black/80">
                   {r.pipeline_2.tokens_total.toLocaleString()}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-700">
+                <td className="px-3.5 py-2.5 font-black text-black">
                   {r.pipeline_3.tokens_total.toLocaleString()}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-700">
+                <td className="px-3.5 py-2.5 font-bold text-black">
                   {r.pipeline_3.latency_ms.toFixed(0)}ms
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3.5 py-2.5">
                   {r.evaluation.judge_pass === null ? (
                     <Badge color="gray">NOT EVALUATED</Badge>
                   ) : (

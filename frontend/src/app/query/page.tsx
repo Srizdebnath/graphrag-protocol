@@ -47,22 +47,26 @@ export default function QueryPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="mb-2 text-xl font-bold text-gray-900">Query Comparison</h1>
-      <p className="mb-6 text-sm text-gray-500">Run a question through all three pipelines side by side.</p>
+    <div className="mx-auto max-w-7xl px-4 py-8 space-y-8">
+      <div>
+        <h1 className="text-2xl font-black uppercase tracking-tight text-black">Query Comparison</h1>
+        <p className="mt-1 font-mono text-xs font-bold text-black/70">
+          Contract 2 Subgraph Context // Run queries across 3 pipelines side by side.
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mb-8 flex gap-3">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="e.g. What methods are used by papers citing the Attention Is All You Need paper?"
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 rounded-xl border-3 border-black bg-white px-4 py-3 font-mono text-sm font-semibold text-black shadow-brutal placeholder:text-black/40 focus:outline-none focus:shadow-brutal-lg transition-all"
         />
         <button
           type="submit"
           disabled={loading || !query.trim()}
-          className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl border-3 border-black bg-[#FFE600] px-8 py-3 font-mono text-sm font-black uppercase tracking-wider text-black shadow-brutal hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-brutal-lg active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutal-sm disabled:cursor-not-allowed disabled:opacity-50 transition-all"
         >
           {loading ? "Running..." : "Run Query"}
         </button>
@@ -72,8 +76,8 @@ export default function QueryPage() {
       {error && <ErrorState message={error} hint="Make sure the backend server is running at http://localhost:8000" />}
 
       {!loading && !error && !results && (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-16 text-center text-sm text-gray-400">
-          Enter a query and click Run to compare pipeline results.
+        <div className="rounded-xl border-3 border-dashed border-black bg-white/70 py-16 text-center font-mono text-xs font-black uppercase tracking-wider text-black/60 shadow-brutal-sm">
+          Enter a question above and click Run Query to compare LLM-only, Vector RAG, and Protocol GraphRAG.
         </div>
       )}
 
