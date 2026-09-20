@@ -831,13 +831,22 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_explain",
         title="Explain retrieval",
-        description="Generate natural-language explanations for why each entity was retrieved.",
+        description="Generate natural-language explanations for why entities were retrieved for a query or in a SubgraphContext. Accepts either 'query' string or 'context' dictionary.",
     )
-    def graphrag_explain(context: dict[str, Any], max_entities: int = 10) -> str:
-        try:
-            ctx = SubgraphContext(**context)
-        except Exception as exc:  # noqa: BLE001
-            return _json({"error": f"Invalid context: {exc}"})
+    def graphrag_explain(
+        query: str | None = None,
+        context: dict[str, Any] | None = None,
+        max_entities: int = 10,
+    ) -> str:
+        if context is None and not query:
+            return _json({"error": "Either 'query' or 'context' must be provided."})
+        if context is None and query:
+            ctx = STATE.retrieval.search(query=query, mode="auto").context
+        else:
+            try:
+                ctx = SubgraphContext(**context)
+            except Exception as exc:  # noqa: BLE001
+                return _json({"error": f"Invalid context: {exc}"})
         return _json(STATE.explanation.explain(ctx, max_entities=max_entities))
 
     @mcp.tool(
@@ -1071,17 +1080,27 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_resolve_conflicts",
         title="Resolve contradictory facts",
-        description="Detect and resolve conflicting properties, claims, or relationships in a SubgraphContext using temporal recency and source authority.",
+        description=(
+            "Detect and resolve conflicting properties, claims, or relationships on a topic or within a SubgraphContext "
+            "using temporal recency and source authority. Accepts either a natural-language 'query' string (auto-retrieves "
+            "the subgraph context) OR a pre-existing 'context' dictionary."
+        ),
     )
     def graphrag_resolve_conflicts(
-        context: dict[str, Any],
+        query: str | None = None,
+        context: dict[str, Any] | None = None,
         recency_weight: float = 0.6,
         authority_weight: float = 0.4,
     ) -> str:
-        try:
-            ctx = SubgraphContext(**context)
-        except Exception as exc:  # noqa: BLE001
-            return _json({"error": f"Invalid context envelope: {exc}"})
+        if context is None and not query:
+            return _json({"error": "Either 'query' or 'context' must be provided to resolve conflicts."})
+        if context is None and query:
+            ctx = STATE.retrieval.search(query=query, mode="auto").context
+        else:
+            try:
+                ctx = SubgraphContext(**context)
+            except Exception as exc:  # noqa: BLE001
+                return _json({"error": f"Invalid context envelope: {exc}"})
         return _json(
             STATE.conflicts.resolve_conflicts(
                 ctx, recency_weight=recency_weight, authority_weight=authority_weight
