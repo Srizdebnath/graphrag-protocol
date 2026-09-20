@@ -366,12 +366,12 @@ Abstract interfaces in `mcp_server/contracts/base.py` (`BaseRetrievalContract`),
 ## 9. Architecture
 
 ```
-Agents (LangGraph, CrewAI, custom)  │  MCP server (16 tools)  │  Protocol contracts  │  Adapters  │  Backends
+Agents (LangGraph, CrewAI, custom)  │  MCP server (27 tools)  │  Protocol contracts  │  Adapters  │  Backends
            │                        │        graphrag_search        │   retrieval        │  TigerGraph│
            │                        │        graphrag_entity         │   schema           │  Neo4j     │
            │      (MCP)             │        graphrag_path           │   provenance  ◄───►│  LightRAG  │
            └────────────────────────►        graphrag_neighborhood   │   construction     │  ChromaDB  │
-                                            ... 16 tools ...         │   federation       │  ...       │
+                                            ... 27 tools ...         │   federation       │  ...       │
 ```
 
 ---
