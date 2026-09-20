@@ -27,10 +27,12 @@ from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
 
 from mcp_server.adapters import DemoGraphRAGAdapter, Neo4jGraphRAGAdapter, TigerGraphAdapter
+from mcp_server.agent_harness import AgenticInvestigationHarness
 from mcp_server.cache import QueryCache
 from mcp_server.contracts.aggregate import AggregateContract
 from mcp_server.contracts.authorization import AuthorizationContract
 from mcp_server.contracts.batch import BatchContract
+from mcp_server.contracts.conflicts import ConflictResolutionContract
 from mcp_server.contracts.construction import ConstructionContract
 from mcp_server.contracts.diff import DiffContract
 from mcp_server.contracts.evaluation import EvaluationContract
@@ -43,6 +45,7 @@ from mcp_server.contracts.schema_discovery import SchemaDiscoveryContract
 from mcp_server.contracts.similarity import SimilarityContract
 from mcp_server.contracts.streaming import STREAM_BUS
 from mcp_server.contracts.temporal import TemporalContract
+from mcp_server.contracts.triage import QueryTriageContract
 from mcp_server.contracts.watch import WatchContract
 from mcp_server.formatters import MarkdownFormatter, StructuredFormatter
 from mcp_server.protocol import SubgraphContext
@@ -107,6 +110,8 @@ class GraphRAGState:
         self._aggregate: AggregateContract | None = None
         self._export: ExportContract | None = None
         self._watch: WatchContract | None = None
+        self._conflicts: ConflictResolutionContract | None = None
+        self._triage: QueryTriageContract | None = None
         self._markdown = MarkdownFormatter()
         self._structured = StructuredFormatter()
         self._storage = PersistentStorage.get_instance()
@@ -203,6 +208,18 @@ class GraphRAGState:
             self._watch = WatchContract(self._storage)
         return self._watch
 
+    @property
+    def conflicts(self) -> ConflictResolutionContract:
+        if self._conflicts is None:
+            self._conflicts = ConflictResolutionContract(self.adapter)
+        return self._conflicts
+
+    @property
+    def triage(self) -> QueryTriageContract:
+        if self._triage is None:
+            self._triage = QueryTriageContract(self.adapter)
+        return self._triage
+
 
 STATE = GraphRAGState()
 
@@ -233,16 +250,15 @@ def _json(obj: Any) -> str:
 
 
 def build_server() -> MCPServer:
-    """Construct the MCP server with all 47 tools, resources, and prompts registered."""
+    """Construct the MCP server with all 50 tools, resources, and prompts registered."""
     mcp = MCPServer(
         name="grip",
         version="0.3.0",
         instructions=(
             "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
-            "Use graphrag_search for natural-language queries (auto-routes to "
-            "local/global/hybrid/entity), graphrag_schema to plan against the "
-            "backend's structure, graphrag_provenance for citation audits, and "
-            "graphrag_batch for parallel execution."
+            "Use graphrag_search for natural-language queries, graphrag_agent_investigate for "
+            "autonomous multi-step reasoning, graphrag_schema to plan against the structure, "
+            "graphrag_resolve_conflicts for contradictory evidence, and graphrag_batch for parallel execution."
         ),
     )
 
@@ -1047,6 +1063,123 @@ def build_server() -> MCPServer:
             })
         except Exception as exc:  # noqa: BLE001
             return _json({"error": str(exc)})
+
+    # ------------------------------------------------------------------
+    # Contract 19 — Conflict & Uncertainty Resolution
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_resolve_conflicts",
+        title="Resolve contradictory facts",
+        description="Detect and resolve conflicting properties, claims, or relationships in a SubgraphContext using temporal recency and source authority.",
+    )
+    def graphrag_resolve_conflicts(
+        context: dict[str, Any],
+        recency_weight: float = 0.6,
+        authority_weight: float = 0.4,
+    ) -> str:
+        try:
+            ctx = SubgraphContext(**context)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context envelope: {exc}"})
+        return _json(
+            STATE.conflicts.resolve_conflicts(
+                ctx, recency_weight=recency_weight, authority_weight=authority_weight
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Contract 20 — Query Triage & ROI Classifier
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_triage_query",
+        title="Query triage and ROI classifier",
+        description="Analyze a question and determine whether plain RAG, standard GraphRAG, or Agentic GraphRAG is optimal, computing estimated token cost vs accuracy ROI.",
+    )
+    def graphrag_triage_query(query: str) -> str:
+        try:
+            return _json(STATE.triage.triage(query))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc)})
+
+    # ------------------------------------------------------------------
+    # Autonomous Agentic Investigation Harness
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_agent_investigate",
+        title="Autonomous multi-step investigation",
+        description="Execute an autonomous multi-step agentic graph investigation across entity linking, traversal, paths, and evidence evaluation. Returns grounded answer and detailed agentic trace.",
+    )
+    def graphrag_agent_investigate(
+        question: str,
+        max_steps: int = 5,
+        target_confidence: float = 0.85,
+    ) -> str:
+        try:
+            harness = AgenticInvestigationHarness(STATE.adapter)
+            res = harness.investigate(
+                question=question,
+                max_steps=max_steps,
+                target_confidence=target_confidence,
+            )
+            return _json({
+                "question": res.question,
+                "answer": res.answer,
+                "answer_source": res.answer_source,
+                "trace": res.trace.model_dump(),
+                "entities_used": len(res.context.results.get("entities") or []),
+                "relationships_used": len(res.context.results.get("relationships") or []),
+                "source_documents": res.context.provenance.source_documents,
+            })
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc)})
+
+    # ------------------------------------------------------------------
+    # MCP Prompts
+    # ------------------------------------------------------------------
+
+    @mcp.prompt(
+        name="investigate_complex_question",
+        description="Execute an autonomous multi-step investigation across entities, relationships, and evidence to answer complex questions.",
+    )
+    def prompt_investigate(question: str) -> str:
+        return (
+            f"Please conduct an autonomous multi-step GraphRAG investigation to thoroughly answer this question:\n\n"
+            f'"{question}"\n\n'
+            "Workflow:\n"
+            "1. Triage the question using `graphrag_triage_query`.\n"
+            "2. If agentic reasoning is recommended, execute `graphrag_agent_investigate` or chain specialized tools (`graphrag_entity`, `graphrag_neighborhood`, `graphrag_path`).\n"
+            "3. If multiple conflicting claims appear, resolve them with `graphrag_resolve_conflicts`.\n"
+            "4. Verify the evidence trail with `graphrag_audit` and provide an answer with explicit citations."
+        )
+
+    @mcp.prompt(
+        name="compare_pipelines",
+        description="Benchmark RAG vs GraphRAG vs Agentic GraphRAG side-by-side with token and accuracy metrics.",
+    )
+    def prompt_compare(question: str) -> str:
+        return (
+            f"Benchmark the three retrieval paradigms on this query:\n\n"
+            f'"{question}"\n\n'
+            "1. Run plain text search using `graphrag_local_search(depth=0)`.\n"
+            "2. Run standard GraphRAG using `graphrag_search(mode='auto')`.\n"
+            "3. Run Agentic GraphRAG using `graphrag_agent_investigate`.\n"
+            "4. Compare their answers, context sizes, and token efficiency."
+        )
+
+    @mcp.prompt(
+        name="resolve_graph_conflicts",
+        description="Detect and resolve contradictory statements, changing facts, or competing sources in the graph.",
+    )
+    def prompt_resolve_conflicts(entity_or_topic: str) -> str:
+        return (
+            f'Analyze contradictory evidence and temporal changes regarding: "{entity_or_topic}".\n\n'
+            "1. Retrieve the neighborhood and temporal context using `graphrag_neighborhood` and `graphrag_temporal_search`.\n"
+            "2. Call `graphrag_resolve_conflicts` to evaluate recency and provenance authority.\n"
+            "3. Present the resolved ground truth and flag remaining uncertainties."
+        )
 
     return mcp
 

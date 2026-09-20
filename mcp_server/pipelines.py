@@ -121,6 +121,7 @@ def _pipeline_row(
     ctx: SubgraphContext | None,
     context_text: str,
     style: str,
+    trace: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one dashboard row with measured tokens/latency and real provenance."""
     import time
@@ -142,6 +143,8 @@ def _pipeline_row(
         row["entities_used"] = ctx.metrics.entities_returned
         row["graph_hops"] = ctx.metrics.graph_hops_traversed
         row["provenance"] = ctx.provenance.model_dump()
+    if trace is not None:
+        row["agentic_trace"] = trace
     return row
 
 
@@ -150,6 +153,7 @@ def run_pipelines(
     formatter: MarkdownFormatter,
     question: str,
     mode: str = "auto",
+    use_agent: bool = True,
 ) -> dict[str, dict[str, Any]]:
     """Run the three-pipeline comparison for one question.
 
@@ -158,6 +162,7 @@ def run_pipelines(
         formatter: Contract-8 formatter used to serialize context.
         question: The user question.
         mode: Retrieval mode for the GraphRAG pipeline.
+        use_agent: Whether pipeline 3 executes the autonomous agentic investigation loop.
 
     Returns:
         ``{"pipeline_1": row, "pipeline_2": row, "pipeline_3": row}``.
@@ -168,11 +173,26 @@ def run_pipelines(
     text2 = formatter.format_context(ctx2, max_tokens=1500)
     row2 = _pipeline_row(name=PIPELINE_2, question=question, ctx=ctx2, context_text=text2, style="rag")
 
-    result3 = retrieval.search(query=question, mode=mode)
-    text3 = formatter.format_context(result3.context, max_tokens=3000)
-    row3 = _pipeline_row(
-        name=PIPELINE_3, question=question, ctx=result3.context, context_text=text3, style="graphrag"
-    )
+    if use_agent:
+        from mcp_server.agent_harness import AgenticInvestigationHarness
+
+        harness = AgenticInvestigationHarness(retrieval._adapter)
+        inv_res = harness.investigate(question=question)
+        text3 = formatter.format_context(inv_res.context, max_tokens=3000)
+        row3 = _pipeline_row(
+            name=PIPELINE_3,
+            question=question,
+            ctx=inv_res.context,
+            context_text=text3,
+            style="graphrag",
+            trace=inv_res.trace.model_dump(),
+        )
+    else:
+        result3 = retrieval.search(query=question, mode=mode)
+        text3 = formatter.format_context(result3.context, max_tokens=3000)
+        row3 = _pipeline_row(
+            name=PIPELINE_3, question=question, ctx=result3.context, context_text=text3, style="graphrag"
+        )
     return {"pipeline_1": row1, "pipeline_2": row2, "pipeline_3": row3}
 
 

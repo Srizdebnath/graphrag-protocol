@@ -23,8 +23,8 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
           +--------->|  GraphRAG      |<-------+
                      |  Interoperability
                      |  Protocol (this)
-                     |  + 18 contracts
-                     |  + 47-tool MCP server
+                     |  + 20 contracts
+                     |  + 50-tool MCP server
                      |  + adapters
                      +----------------+
 </pre>
@@ -44,10 +44,12 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 7. **Interoperable Export.** The export contract (Contract 16) serializes subgraphs directly to GraphML, Cypher `MERGE`, JSON-LD, and RDF-Turtle.
 8. **High Throughput.** The batch runner (Contract 17) fans out tool execution concurrently up to 25 parallel queries in a single agent step.
 9. **Event-Driven Subscriptions.** The watch contract (Contract 18) bridges the streaming bus with persistent SQLite journal replay.
+10. **Contradiction Resolution.** The conflict contract (Contract 19) detects opposing relations, resolving them by recency and provenance authority.
+11. **Cost-Aware Routing.** The triage contract (Contract 20) evaluates query complexity to avoid expensive agentic reasoning when simpler RAG suffices.
 
 ---
 
-## 2. The 18 Contracts
+## 2. The 20 Contracts
 
 | # | Contract | Purpose | JSON Schema | Status |
 |---|----------|---------|-------------|--------|
@@ -69,6 +71,8 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 | 16 | **Subgraph Export** | GraphML, Cypher, JSON-LD, RDF Turtle serialization | — | `contracts/export.py` |
 | 17 | **Batch Execution** | Concurrent tool execution fan-out (up to 25 items) | — | `contracts/batch.py` |
 | 18 | **Watch & Subscriptions** | Filtered graph change querying & replay over SQLite | — | `contracts/watch.py` |
+| 19 | **Conflict & Uncertainty** | Contradiction detection, temporal & authority resolution | — | `contracts/conflicts.py` |
+| 20 | **Query Triage & ROI** | Cost-benefit classification (RAG vs GraphRAG vs Agentic) | — | `contracts/triage.py` |
 
 
 
@@ -381,7 +385,7 @@ Abstract interfaces in `mcp_server/contracts/base.py` (`BaseRetrievalContract`),
 ## 9. Architecture
 
 ```
-Agents (LangGraph, CrewAI, custom)  │  MCP server (47 tools)  │  Protocol contracts  │  Adapters  │  Backends
+Agents (LangGraph, CrewAI, custom)  │  MCP server (50 tools)  │  Protocol contracts  │  Adapters  │  Backends
            │                        │        graphrag_search        │   retrieval        │  TigerGraph│
            │                        │        graphrag_entity         │   schema           │  Neo4j     │
            │      (MCP)             │        graphrag_path           │   provenance  ◄───►│  LightRAG  │
@@ -393,12 +397,15 @@ Agents (LangGraph, CrewAI, custom)  │  MCP server (47 tools)  │  Protocol co
                                              graphrag_export_subgraph  │   export                       │
                                              graphrag_batch            │   batch                        │
                                              graphrag_watch            │   watch                        │
-                                             ... 47 tools ...         │                                │
+                                             graphrag_resolve_conflicts│   conflicts                    │
+                                             graphrag_triage_query     │   triage                       │
+                                             graphrag_agent_investigate│   agent harness                │
+                                             ... 50 tools ...         │                                │
 ```
 
 ---
 
-## 10. Contracts 4, 6, 7, 9, 10, 16, 17, 18 (Summaries)
+## 10. Contracts 4, 6, 7, 9, 10, 16, 17, 18, 19, 20 (Summaries)
 
 ### 10.1 Contract 4 — Construction (`IngestionConfig`)
 
@@ -487,6 +494,22 @@ Persistent SQLite-backed stream event log allowing filtered queries, replays, an
 
 ```python
 watch(event_types, entity_id, since_iso, limit=50) -> list[dict[str, Any]]
+```
+
+### 10.9 Contract 19 — Conflict & Uncertainty Resolution (`ConflictResolutionContract`)
+
+Scans subgraph contexts for contradictory claims, opposing relationships, and conflicting properties, resolving them using temporal recency and citation authority.
+
+```python
+resolve_conflicts(context, recency_weight=0.6, authority_weight=0.4) -> dict[str, Any]
+```
+
+### 10.10 Contract 20 — Query Triage & ROI Classifier (`QueryTriageContract`)
+
+Calculates semantic complexity and multi-hop indicators to predict the optimal retrieval paradigm (RAG vs GraphRAG vs Agentic GraphRAG) and expected token-ROI.
+
+```python
+triage(query) -> dict[str, Any]
 ```
 
 ---

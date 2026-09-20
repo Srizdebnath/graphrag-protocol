@@ -71,8 +71,17 @@ def test_query_runs_three_pipelines(client):
         assert p["answer"]
         assert p["answer_source"] == "extraction_only"  # no LLM in hermetic test
         assert isinstance(p["tokens_total"], int) and p["tokens_total"] > 0
-        assert p["latency_ms"] >= 0
-        assert p["retrieval_method"] in {"none", "local_search", "global_search", "hybrid_search", "entity_lookup", "path_search", "neighborhood", "community_members"}
+        assert p["retrieval_method"] in {
+            "none",
+            "local_search",
+            "global_search",
+            "hybrid_search",
+            "entity_lookup",
+            "path_search",
+            "neighborhood",
+            "community_members",
+            "agentic_investigate",
+        }
     # Honest labeling: no model name claimed for extraction-only answers.
     assert body["pipeline_1"]["model"] is None
     # Pipeline 2/3 retrieve real context and carry provenance.

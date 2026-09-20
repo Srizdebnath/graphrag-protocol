@@ -14,6 +14,7 @@ from .aggregate import AggregateContract
 from .authorization import AuthorizationContract
 from .base import BaseRetrievalContract
 from .batch import BatchContract
+from .conflicts import ConflictResolutionContract
 from .construction import ConstructionContract, extract_concepts
 from .diff import DiffContract
 from .evaluation import EvaluationContract, content_terms
@@ -26,6 +27,7 @@ from .schema_discovery import SchemaDiscoveryContract
 from .similarity import SimilarityContract
 from .streaming import STREAM_BUS, StreamBus, publish_ingestion_report
 from .temporal import TemporalContract
+from .triage import QueryTriageContract
 from .watch import WatchContract
 
 __all__ = [
@@ -34,6 +36,7 @@ __all__ = [
     "AuthorizationContract",
     "BaseRetrievalContract",
     "BatchContract",
+    "ConflictResolutionContract",
     "ConstructionContract",
     "DiffContract",
     "EvaluationContract",
@@ -41,6 +44,7 @@ __all__ = [
     "ExportContract",
     "FederationContract",
     "ProvenanceContract",
+    "QueryTriageContract",
     "RetrievalContract",
     "SchemaDiscoveryContract",
     "SimilarityContract",

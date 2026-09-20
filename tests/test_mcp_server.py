@@ -35,10 +35,10 @@ def _call(server, name: str, arguments: dict) -> dict:
     return json.loads(result.content[0].text)
 
 
-def test_registers_all_47_protocol_tools(server):
+def test_registers_all_50_protocol_tools(server):
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
-    assert len(names) == 47
+    assert len(names) == 50
     # Original 27 tools
     original_27 = {
         "graphrag_search",
@@ -69,7 +69,7 @@ def test_registers_all_47_protocol_tools(server):
         "graphrag_evaluate",
         "graphrag_authorize",
     }
-    # 15 tools (Contracts 11-15 + admin extensions)
+    # 15 tools (Contracts 11-15 + job, backend, audit)
     new_15 = {
         "graphrag_similarity",
         "graphrag_entity_similarity",
@@ -95,7 +95,13 @@ def test_registers_all_47_protocol_tools(server):
         "graphrag_next_page",
         "graphrag_capability_token",
     }
-    expected = original_27 | new_15 | new_5
+    # 3 tools (Contracts 19-20 + autonomous investigation)
+    new_3 = {
+        "graphrag_agent_investigate",
+        "graphrag_resolve_conflicts",
+        "graphrag_triage_query",
+    }
+    expected = original_27 | new_15 | new_5 | new_3
     assert names == expected
 
 

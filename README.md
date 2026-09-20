@@ -82,11 +82,13 @@ ruff check mcp_server/ hackathon/ tests/
 | 16 | **Subgraph Export** | Export subgraphs to GraphML, Cypher `MERGE`, JSON-LD, and RDF Turtle | `contracts/export.py` — done |
 | 17 | **Batch Runner** | Concurrent execution fan-out for up to 25 parallel tool calls | `contracts/batch.py` — done |
 | 18 | **Watch & Subscriptions** | Filtered graph change querying & replay over persistent SQLite store | `contracts/watch.py` — done |
+| 19 | **Conflict & Uncertainty** | Contradiction detection, temporal & authority resolution | `contracts/conflicts.py` — done |
+| 20 | **Query Triage & ROI** | Semantic complexity routing & cost-benefit recommendation | `contracts/triage.py` — done |
 
 JSON Schemas for Contracts 1–10 live in `schemas/`; `tests/test_schemas.py`
 fails if any schema drifts from its Pydantic model.
 
-## MCP Tool Surface (47 tools)
+## MCP Tool Surface (50 tools)
 
 ### Core & Retrieval Tools (27 tools)
 | Tool | Contract | Description |
@@ -138,9 +140,12 @@ fails if any schema drifts from its Pydantic model.
 | `graphrag_register_backend` | 6-ext | Register a new federated backend |
 | `graphrag_audit_log` | 10-ext | Immutable mutation audit log |
 
-### v0.3.0 God-Level Upgrades (5 tools)
+### Autonomous Agentic & Advanced Tools (8 tools)
 | Tool | Contract | Description |
 |------|----------|-------------|
+| `graphrag_agent_investigate` | Harness | Autonomous multi-step investigation emitting an `AgenticTrace` |
+| `graphrag_resolve_conflicts` | 19 | Detect and resolve contradictory facts using recency & provenance |
+| `graphrag_triage_query` | 20 | Predict optimal pipeline (RAG vs GraphRAG vs Agentic) and token-ROI |
 | `graphrag_export_subgraph` | 16 | Export subgraphs to GraphML, Cypher, JSON-LD, RDF Turtle |
 | `graphrag_batch` | 17 | Parallel tool execution fan-out (up to 25 queries) |
 | `graphrag_watch` | 18 | Event replay & streaming change query with filtering |
