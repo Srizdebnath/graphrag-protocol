@@ -57,3 +57,29 @@ export async function getGraphVisualization(
     body: JSON.stringify(entityId ? { entity_id: entityId } : {}),
   });
 }
+
+export async function ingestDocument(
+  doc: {
+    id: string;
+    text: string;
+    properties?: Record<string, unknown>;
+  },
+  adminToken: string,
+  dryRun: boolean = false
+): Promise<Record<string, unknown>> {
+  return request("/ingest", {
+    method: "POST",
+    headers: {
+      "X-Admin-Token": adminToken,
+    },
+    body: JSON.stringify({
+      documents: [doc],
+      dry_run: dryRun,
+    }),
+  });
+}
+
+export function getStreamUrl(eventTypes?: string): string {
+  const base = `${API_URL}/stream/events`;
+  return eventTypes ? `${base}?event_types=${encodeURIComponent(eventTypes)}` : base;
+}

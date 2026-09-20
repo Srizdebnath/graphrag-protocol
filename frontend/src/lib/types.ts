@@ -52,11 +52,18 @@ export interface TextChunk {
 
 export interface Provenance {
   query_id?: string;
-  citations: Record<string, unknown>[];
-  visited_entities: string[];
-  cited_entities: string[];
-  completeness_score: number;
   source_documents: string[];
+  traversal_log?: Record<string, unknown>[];
+  visited_not_cited?: string[];
+  total_entities_examined?: number;
+  total_chunks_examined?: number;
+  total_chunks_returned?: number;
+  backend?: string;
+  backend_version?: string;
+  citations?: Record<string, unknown>[];
+  visited_entities?: string[];
+  cited_entities?: string[];
+  completeness_score?: number;
 }
 
 export interface RetrievalMetrics {
@@ -89,30 +96,41 @@ export interface SubgraphContext {
 }
 
 export interface EntityType {
-  name: string;
+  type: string;
+  name?: string;
   count: number;
   attributes: Record<string, string>;
+  sample?: Record<string, unknown>;
 }
 
 export interface RelationshipType {
-  name: string;
-  source: string;
-  target: string;
+  type: string;
+  name?: string;
+  source_type?: string;
+  target_type?: string;
+  source?: string;
+  target?: string;
+  directed?: boolean;
   count: number;
+  attributes?: Record<string, string>;
 }
 
 export interface GraphStatistics {
   total_vertices: number;
   total_edges: number;
-  density: number;
-  components: number;
+  avg_degree?: number;
+  density?: number;
+  connected_components?: number;
+  components?: number;
 }
 
 export interface GraphSchema {
   protocol: string;
   graph_id: string;
-  entity_types: EntityType[];
-  relationship_types: RelationshipType[];
+  vertex_types: EntityType[];
+  edge_types: RelationshipType[];
+  entity_types?: EntityType[];
+  relationship_types?: RelationshipType[];
   statistics: GraphStatistics;
 }
 

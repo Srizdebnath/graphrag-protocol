@@ -67,8 +67,16 @@ export default function ProtocolPage() {
             {[
               { label: "Total Vertices", value: schema.statistics.total_vertices.toLocaleString() },
               { label: "Total Edges", value: schema.statistics.total_edges.toLocaleString() },
-              { label: "Density", value: schema.statistics.density.toFixed(4) },
-              { label: "Components", value: schema.statistics.components.toLocaleString() },
+              {
+                label: "Density / Avg Degree",
+                value: schema.statistics.density !== undefined
+                  ? schema.statistics.density.toFixed(4)
+                  : (schema.statistics.avg_degree ?? 0).toFixed(2),
+              },
+              {
+                label: "Connected Components",
+                value: (schema.statistics.connected_components ?? schema.statistics.components ?? 0).toLocaleString(),
+              },
             ].map((s) => (
               <Card key={s.label}>
                 <p className="text-xs text-gray-500">{s.label}</p>
@@ -77,63 +85,81 @@ export default function ProtocolPage() {
             ))}
           </div>
 
-          {/* Entity Types */}
-          <Card title="Vertex Types" subtitle={`${schema.entity_types.length} types in the graph`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Attributes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {schema.entity_types.map((et) => (
-                    <tr key={et.name} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 font-medium text-gray-900">{et.name}</td>
-                      <td className="px-3 py-2 text-gray-700">{et.count.toLocaleString()}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(et.attributes).map(([k, v]) => (
-                            <Badge key={k} color="gray">
-                              {k}: {v}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {/* Entity / Vertex Types */}
+          {(() => {
+            const vtypes = schema.vertex_types || schema.entity_types || [];
+            return (
+              <Card title="Vertex Types" subtitle={`${vtypes.length} types in the graph`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-gray-200 bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Attributes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {vtypes.map((et) => {
+                        const typeName = et.type || et.name || "Unknown";
+                        return (
+                          <tr key={typeName} className="hover:bg-gray-50/50">
+                            <td className="px-3 py-2 font-medium text-gray-900">{typeName}</td>
+                            <td className="px-3 py-2 text-gray-700">{(et.count || 0).toLocaleString()}</td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap gap-1">
+                                {Object.entries(et.attributes || {}).map(([k, v]) => (
+                                  <Badge key={k} color="gray">
+                                    {k}: {v}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            );
+          })()}
 
-          {/* Edge Types */}
-          <Card title="Edge Types" subtitle={`${schema.relationship_types.length} relationship types`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Source → Target</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {schema.relationship_types.map((rt) => (
-                    <tr key={rt.name} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 font-medium text-gray-900">{rt.name}</td>
-                      <td className="px-3 py-2 text-gray-700">
-                        {rt.source} → {rt.target}
-                      </td>
-                      <td className="px-3 py-2 text-gray-700">{rt.count.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          {/* Edge / Relationship Types */}
+          {(() => {
+            const etypes = schema.edge_types || schema.relationship_types || [];
+            return (
+              <Card title="Edge Types" subtitle={`${etypes.length} relationship types`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-gray-200 bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Source → Target</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-600">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {etypes.map((rt) => {
+                        const typeName = rt.type || rt.name || "Unknown";
+                        const src = rt.source_type || rt.source || "*";
+                        const tgt = rt.target_type || rt.target || "*";
+                        return (
+                          <tr key={typeName} className="hover:bg-gray-50/50">
+                            <td className="px-3 py-2 font-medium text-gray-900">{typeName}</td>
+                            <td className="px-3 py-2 text-gray-700">
+                              {src} → {tgt}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">{(rt.count || 0).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            );
+          })()}
         </div>
       )}
 

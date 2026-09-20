@@ -9,6 +9,7 @@ const links = [
   { href: "/benchmark", label: "Benchmark" },
   { href: "/protocol", label: "Protocol" },
   { href: "/graph", label: "Graph" },
+  { href: "/ingest", label: "Ingest & Stream" },
 ];
 
 export default function Navbar() {

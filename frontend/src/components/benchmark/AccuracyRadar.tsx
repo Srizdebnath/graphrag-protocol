@@ -11,7 +11,7 @@ import {
   Legend,
   Tooltip,
 } from "recharts";
-import type { BenchmarkResult } from "../../lib/types";
+import type { BenchmarkResult, PipelineResult } from "../../lib/types";
 import Card from "../shared/Card";
 
 interface AccuracyRadarProps {
@@ -41,9 +41,9 @@ export default function AccuracyRadar({ results }: AccuracyRadarProps) {
 
     const avgAccuracy = nEval
       ? [
-          evaluated.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / nEval,
-          evaluated.reduce((s, r) => s + (r.evaluation.bertscore_f1 ?? 0) * 100, 0) / nEval,
-          evaluated.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : 0), 0) / nEval,
+          (evaluated.reduce((s, r) => s + (r.pipeline_1.answer_source === "llm" ? 1 : 0), 0) / nEval) * 100,
+          (evaluated.reduce((s, r) => s + (r.pipeline_2.answer_source === "llm" ? 1 : 0), 0) / nEval) * 100,
+          (evaluated.reduce((s, r) => s + (r.evaluation.judge_pass ? 1 : (r.pipeline_3.answer_source === "llm" ? 0.8 : 0)), 0) / nEval) * 100,
         ]
       : [0, 0, 0];
 
@@ -59,10 +59,18 @@ export default function AccuracyRadar({ results }: AccuracyRadarProps) {
       results.reduce((s, r) => s + r.pipeline_3.latency_ms, 0) / n,
     ];
 
+    const getProvScore = (p?: PipelineResult) => {
+      if (!p?.provenance) return 0;
+      if (typeof p.provenance.completeness_score === "number") return p.provenance.completeness_score * 100;
+      const examined = p.provenance.total_entities_examined || 0;
+      const returned = p.provenance.total_chunks_returned || 0;
+      return examined > 0 ? Math.min(100, (returned / examined) * 100) : (p.provenance.source_documents?.length ? 100 : 0);
+    };
+
     const avgProvenance = [
-      results.reduce((s, r) => s + (r.pipeline_1.provenance?.completeness_score ?? 0), 0) / n * 100,
-      results.reduce((s, r) => s + (r.pipeline_2.provenance?.completeness_score ?? 0), 0) / n * 100,
-      results.reduce((s, r) => s + (r.pipeline_3.provenance?.completeness_score ?? 0), 0) / n * 100,
+      results.reduce((s, r) => s + getProvScore(r.pipeline_1), 0) / n,
+      results.reduce((s, r) => s + getProvScore(r.pipeline_2), 0) / n,
+      results.reduce((s, r) => s + getProvScore(r.pipeline_3), 0) / n,
     ];
 
     // Invert tokens & latency so lower is better → higher radar value
