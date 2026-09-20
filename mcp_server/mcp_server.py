@@ -161,10 +161,10 @@ def _json(obj: Any) -> str:
 def build_server() -> MCPServer:
     """Construct the MCP server with all 27 tools registered."""
     mcp = MCPServer(
-        name="graphrag-protocol",
+        name="grip",
         version="0.1.0",
         instructions=(
-            "GraphRAG Protocol: uniform access to any GraphRAG backend. "
+            "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
             "Use graphrag_search for natural-language queries (auto-routes to "
             "local/global/hybrid/entity), graphrag_schema to plan against the "
             "backend's structure, and graphrag_provenance for citation audits."

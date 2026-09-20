@@ -3,9 +3,9 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "graphrag-protocol"
+name = "grip-protocol"
 version = "0.1.0"
-description = "Universal GraphRAG Interoperability Protocol - standard contracts + MCP server + adapters to query any GraphRAG backend uniformly"
+description = "Universal GraphRAG Interoperability Protocol (GRIP) — 27-tool MCP server, verifiable provenance, and standard contracts for knowledge graph RAG"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -16,7 +16,6 @@ keywords = ["graphrag", "knowledge-graph", "mcp", "retrieval", "graph", "protoco
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -26,20 +25,15 @@ classifiers = [
 ]
 
 dependencies = [
-    # Core protocol: models + contracts only. Serving/adapters are extras so
-    # the protocol core installs light (see README "Installation").
     "pydantic>=2",
     "python-dotenv",
+    "mcp>=2",
+    "fastapi",
+    "uvicorn",
+    "httpx",
 ]
 
 [project.optional-dependencies]
-server = [
-    # HTTP demo server (FastAPI) + MCP stdio server (mcp SDK)
-    "fastapi",
-    "uvicorn",
-    "mcp>=2",
-    "httpx",
-]
 tigergraph = [
     "pyTigerGraph",
 ]
@@ -57,11 +51,20 @@ rag = [
 eval = [
     "bert-score",
 ]
+all = [
+    "pyTigerGraph",
+    "google-genai",
+    "chromadb",
+    "bert-score",
+]
 
 [project.scripts]
-# Real MCP server (stdio) — expose the protocol contracts as MCP tools
+# Primary CLI / MCP executable
+grip = "mcp_server.mcp_server:main"
+grip-mcp = "mcp_server.mcp_server:main"
+grip-server = "mcp_server.server:main"
+# Aliases
 graphrag-mcp = "mcp_server.mcp_server:main"
-# HTTP demo/dashboard server (FastAPI)
 graphrag-server = "mcp_server.server:main"
 
 [tool.setuptools.packages.find]
