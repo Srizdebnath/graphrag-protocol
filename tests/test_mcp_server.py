@@ -35,27 +35,40 @@ def _call(server, name: str, arguments: dict) -> dict:
     return json.loads(result.content[0].text)
 
 
-def test_registers_all_16_protocol_tools(server):
+def test_registers_all_27_protocol_tools(server):
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
-    assert len(names) >= 16
-    assert {
+    assert len(names) == 27
+    expected = {
         "graphrag_search",
+        "graphrag_local_search",
+        "graphrag_global_search",
+        "graphrag_hybrid_search",
         "graphrag_entity",
         "graphrag_path",
         "graphrag_neighborhood",
         "graphrag_community",
-        "graphrag_local_search",
-        "graphrag_global_search",
-        "graphrag_hybrid_search",
         "graphrag_schema",
+        "graphrag_entity_types",
+        "graphrag_relationship_types",
         "graphrag_sample",
         "graphrag_provenance",
+        "graphrag_trajectory",
+        "graphrag_sources",
+        "graphrag_audit",
         "graphrag_format",
         "graphrag_status",
         "graphrag_config",
         "graphrag_list_backends",
-} <= names, f"missing: {names}"
+        "graphrag_ingest",
+        "graphrag_delete_document",
+        "graphrag_federated_search",
+        "graphrag_entity_link",
+        "graphrag_events",
+        "graphrag_evaluate",
+        "graphrag_authorize",
+    }
+    assert names == expected
 
 
 def test_search_returns_protocol_envelope(server):

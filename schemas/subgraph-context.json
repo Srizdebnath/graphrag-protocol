@@ -213,6 +213,11 @@
           "description": "Entities that were examined during traversal but not cited in the final context.",
           "items": { "type": "string" }
         },
+        "extraction_provenance": {
+          "type": "array",
+          "description": "Mapping of graph elements to the text spans and source documents from which they were extracted.",
+          "items": { "$ref": "#/definitions/ExtractionRecord" }
+        },
         "total_entities_examined": { "type": "integer", "description": "Total entities visited." },
         "total_chunks_examined": { "type": "integer", "description": "Total chunks considered." },
         "total_chunks_returned": { "type": "integer", "description": "Total chunks returned in context." },
@@ -227,12 +232,25 @@
         "source_documents",
         "traversal_log",
         "visited_not_cited",
+        "extraction_provenance",
         "total_entities_examined",
         "total_chunks_examined",
         "total_chunks_returned",
         "backend",
         "backend_version"
       ]
+    },
+    "ExtractionRecord": {
+      "type": "object",
+      "description": "Maps a graph element to its extraction provenance: the source document and the verbatim text span that justified it.",
+      "properties": {
+        "element_id": { "type": "string", "description": "The entity or relationship id this record describes." },
+        "source_doc": { "type": "string", "description": "The source document from which the element was extracted." },
+        "chunk_id": { "type": "string", "description": "The text chunk id containing the extracted span." },
+        "extracted_text": { "type": "string", "description": "The verbatim text span that justified extraction." },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "Extraction confidence in [0, 1]." }
+      },
+      "required": ["element_id", "source_doc", "chunk_id", "extracted_text", "confidence"]
     },
     "TraversalStep": {
       "type": "object",

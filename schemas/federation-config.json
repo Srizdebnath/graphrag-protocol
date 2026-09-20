@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/federation-config.json",
+  "title": "FederationConfig",
+  "description": "Contract 6: query several graphs (TigerGraph graphs in the same workspace) and merge the results under an explicit, transparent policy. Every merged entity records the backends it came from, and the merged context echoes per-backend timings so a partial fan-out is auditable.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "backends": {
+      "type": "array",
+      "description": "Fan-out targets. An empty list means the primary backend answers alone.",
+      "items": { "$ref": "#/definitions/BackendRef" }
+    },
+    "merge_strategy": {
+      "$ref": "#/definitions/MergeStrategy",
+      "description": "How per-backend rankings/scores are combined.",
+      "default": "rrf"
+    },
+    "top_k": {
+      "type": "integer",
+      "description": "Maximum merged entities returned.",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 10
+    },
+    "rrf_k": {
+      "type": "integer",
+      "description": "Reciprocal rank fusion constant (standard: 60).",
+      "minimum": 1,
+      "default": 60
+    }
+  },
+  "definitions": {
+    "BackendRef": {
+      "type": "object",
+      "description": "One participant in a federated query.",
+      "properties": {
+        "name": { "type": "string", "description": "Logical backend name, e.g. 'primary' or 'arxiv_graph'." },
+        "graph_id": { "type": "string", "description": "TigerGraph graph name to fan the query out to." },
+        "weight": { "type": "number", "description": "Positive merge weight; higher weights dominate the merge.", "exclusiveMinimum": 0, "default": 1.0 }
+      },
+      "required": ["name", "graph_id"]
+    },
+    "MergeStrategy": {
+      "type": "string",
+      "description": "rrf: reciprocal rank fusion, sum(weight / (rrf_k + rank)). weighted_score: sum(weight * relevance) / sum(weight).",
+      "enum": ["rrf", "weighted_score"]
+    },
+    "EntityLink": {
+      "type": "object",
+      "description": "A cross-graph entity resolution candidate.",
+      "properties": {
+        "entity_name": { "type": "string" },
+        "graph_id": { "type": "string" },
+        "entity_id": { "type": "string" },
+        "entity_type": { "type": "string" },
+        "score": { "type": "number", "description": "Match score (1.0 for exact id/name, 0.6 for containment) scaled by the backend weight." }
+      },
+      "required": ["entity_name", "graph_id", "entity_id", "entity_type", "score"]
+    }
+  }
+}

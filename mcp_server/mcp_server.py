@@ -30,11 +30,23 @@ from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
 
 from mcp_server.adapters import DemoGraphRAGAdapter, TigerGraphAdapter
+from mcp_server.contracts.authorization import AuthorizationContract
+from mcp_server.contracts.construction import ConstructionContract
+from mcp_server.contracts.evaluation import EvaluationContract
+from mcp_server.contracts.federation import FederationContract
 from mcp_server.contracts.provenance import ProvenanceContract
 from mcp_server.contracts.retrieval import RetrievalContract
 from mcp_server.contracts.schema_discovery import SchemaDiscoveryContract
+from mcp_server.contracts.streaming import STREAM_BUS
 from mcp_server.formatters import MarkdownFormatter, StructuredFormatter
 from mcp_server.protocol import SubgraphContext
+from mcp_server.protocol_extensions import (
+    BackendRef,
+    FederationConfig,
+    IngestionConfig,
+    MergeStrategy,
+    StreamEventType,
+)
 
 _DEFAULT_MAX_TOKENS = 4096
 
@@ -65,6 +77,10 @@ class GraphRAGState:
         self._retrieval: RetrievalContract | None = None
         self._schema: SchemaDiscoveryContract | None = None
         self._provenance: ProvenanceContract | None = None
+        self._construction: ConstructionContract | None = None
+        self._federation: FederationContract | None = None
+        self._evaluation: EvaluationContract | None = None
+        self._authorization: AuthorizationContract | None = None
         self._markdown = MarkdownFormatter()
         self._structured = StructuredFormatter()
 
@@ -91,6 +107,30 @@ class GraphRAGState:
         if self._provenance is None:
             self._provenance = ProvenanceContract(self.adapter)
         return self._provenance
+
+    @property
+    def construction(self) -> ConstructionContract:
+        if self._construction is None:
+            self._construction = ConstructionContract(self.adapter)
+        return self._construction
+
+    @property
+    def federation(self) -> FederationContract:
+        if self._federation is None:
+            self._federation = FederationContract(self.adapter)
+        return self._federation
+
+    @property
+    def evaluation(self) -> EvaluationContract:
+        if self._evaluation is None:
+            self._evaluation = EvaluationContract(self.adapter)
+        return self._evaluation
+
+    @property
+    def authorization(self) -> AuthorizationContract:
+        if self._authorization is None:
+            self._authorization = AuthorizationContract()
+        return self._authorization
 
 
 STATE = GraphRAGState()
@@ -119,7 +159,7 @@ def _json(obj: Any) -> str:
 
 
 def build_server() -> MCPServer:
-    """Construct the MCP server with all 20 tools registered."""
+    """Construct the MCP server with all 27 tools registered."""
     mcp = MCPServer(
         name="graphrag-protocol",
         version="0.1.0",
@@ -398,6 +438,164 @@ def build_server() -> MCPServer:
                 "available": ["tigergraph", "demo"],
                 "active": active,
                 "note": "Add more adapters by implementing BaseGraphRAGAdapter.",
+            }
+        )
+
+    # ------------------------------------------------------------------
+    # Construction (Contract 4) — admin gated
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_ingest",
+        title="Ingest documents",
+        description=(
+            "Real document -> knowledge-graph ingestion (Contract 4). Requires "
+            "the admin token; counters in the report are measured from the backend."
+        ),
+    )
+    def graphrag_ingest(
+        documents: list[dict[str, Any]],
+        dry_run: bool = False,
+        extraction: str = "frequency",
+        max_concepts_per_doc: int = 5,
+        admin_token: str | None = None,
+    ) -> str:
+        decision = STATE.authorization.check_permission("ingest", token=admin_token)
+        if not decision.allowed:
+            return _json({"error": "permission denied", **decision.model_dump()})
+        config = IngestionConfig(
+            graph_id=getattr(STATE.adapter, "_graphname", "default"),
+            extraction=extraction,
+            max_concepts_per_doc=max_concepts_per_doc,
+            dry_run=dry_run,
+        )
+        try:
+            report = STATE.construction.ingest(documents, config)
+        except RuntimeError as exc:
+            return _json({"error": str(exc)})
+        return _json(report.model_dump())
+
+    @mcp.tool(
+        name="graphrag_delete_document",
+        title="Delete document",
+        description="Delete a Paper vertex and its edges from the graph (Contract 4, admin only).",
+    )
+    def graphrag_delete_document(document_id: str, admin_token: str | None = None) -> str:
+        decision = STATE.authorization.check_permission("delete_document", token=admin_token)
+        if not decision.allowed:
+            return _json({"error": "permission denied", **decision.model_dump()})
+        return _json(STATE.construction.delete_document(document_id).model_dump())
+
+    # ------------------------------------------------------------------
+    # Federation (Contract 6)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_federated_search",
+        title="Federated search",
+        description=(
+            "Fan a query out to multiple graphs in the workspace and merge the "
+            "results with reciprocal rank fusion or weighted score (Contract 6)."
+        ),
+    )
+    def graphrag_federated_search(
+        query: str,
+        mode: str = "auto",
+        top_k: int = 10,
+        merge_strategy: str = "rrf",
+        extra_graphs: list[str] | None = None,
+        format_text: str = "none",
+        max_tokens: int = _DEFAULT_MAX_TOKENS,
+    ) -> str:
+        graph = getattr(STATE.adapter, "_graphname", None)
+        backends = [BackendRef(name="primary", graph_id=graph)] if graph else []
+        for name in extra_graphs or []:
+            backends.append(BackendRef(name=name, graph_id=name))
+        config = FederationConfig(
+            backends=backends, merge_strategy=MergeStrategy(merge_strategy), top_k=top_k
+        )
+        ctx = STATE.federation.federated_search(query, config=config, mode=mode)
+        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+
+    @mcp.tool(
+        name="graphrag_entity_link",
+        title="Cross-graph entity link",
+        description="Find the same entity across federated graphs (Contract 6).",
+    )
+    def graphrag_entity_link(entity_name: str, entity_type: str | None = None) -> str:
+        graph = getattr(STATE.adapter, "_graphname", None)
+        config = FederationConfig(backends=[BackendRef(name="primary", graph_id=graph)] if graph else [])
+        links = STATE.federation.cross_graph_entity_link(entity_name, config=config, entity_type=entity_type)
+        return _json([link.model_dump() for link in links])
+
+    # ------------------------------------------------------------------
+    # Streaming (Contract 7)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_events",
+        title="Recent graph events",
+        description=(
+            "Recent graph-mutation events from the streaming bus (Contract 7). "
+            "Ingestion publishes real events here; the HTTP server exposes a live "
+            "SSE feed at /stream/events."
+        ),
+    )
+    def graphrag_events(limit: int = 20, event_type: str | None = None) -> str:
+        events = STREAM_BUS.recent(max(1, min(limit, 200)))
+        if event_type:
+            events = [e for e in events if e.event_type.value == event_type]
+        return _json(
+            {
+                "subscribers": STREAM_BUS.subscriber_count,
+                "events": [e.model_dump(mode="json") for e in events],
+                "known_types": [t.value for t in StreamEventType],
+            }
+        )
+
+    # ------------------------------------------------------------------
+    # Evaluation (Contract 9) + Authorization (Contract 10)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_evaluate",
+        title="Evaluate pipelines",
+        description=(
+            "Run real retrieval/answer evaluation over the benchmark query set "
+            "(Contract 9): precision@k, recall@k, LLM-as-judge and grounding."
+        ),
+    )
+    def graphrag_evaluate(limit: int = 5, mode: str = "auto", pipeline: str = "graphrag") -> str:
+        from mcp_server.pipelines import load_query_set
+
+        references: dict[str, str] = {}
+        try:
+            with open("hackathon/data/queries/reference_answers.json") as handle:
+                references = json.load(handle)
+        except Exception as exc:  # noqa: BLE001 - references are optional
+            print(f"[mcp_server] references unavailable ({type(exc).__name__})", file=sys.stderr)
+        try:
+            query_set = [
+                {**item, "reference": references.get(item["id"], "")}
+                for item in load_query_set(limit=max(1, min(limit, 25)))
+            ]
+        except (OSError, ValueError) as exc:
+            # Never invent queries: report the real problem instead.
+            return _json({"error": f"benchmark query set unavailable: {exc}"})
+        report = STATE.evaluation.evaluate_report(query_set, mode=mode, pipeline=pipeline)
+        return _json(report.model_dump())
+
+    @mcp.tool(
+        name="graphrag_authorize",
+        title="Check permission",
+        description="Check whether an operation is permitted for a role/token (Contract 10).",
+    )
+    def graphrag_authorize(operation: str, admin_token: str | None = None) -> str:
+        result = STATE.authorization.check_permission(operation, token=admin_token)
+        return _json(
+            {
+                **result.model_dump(),
+                "allowed_operations": STATE.authorization.get_allowed_operations(token=admin_token),
             }
         )
 

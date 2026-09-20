@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/access-policy.json",
+  "title": "AccessPolicy",
+  "description": "Contract 10: per-operation permission model for exposing GraphRAG operations through MCP/HTTP. Roles are resolved from a bearer token: 'admin' when the token matches GRAPHRAG_ADMIN_TOKEN (compared in constant time), otherwise the default role. Write operations fail closed when no admin token is configured, and every check returns an auditable PermissionResult.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "default_role": {
+      "type": "string",
+      "description": "Role assumed when no admin token is presented.",
+      "default": "anonymous"
+    },
+    "admin_role": {
+      "type": "string",
+      "description": "Role granted by a valid admin token.",
+      "default": "admin"
+    },
+    "allow_anonymous": {
+      "type": "array",
+      "description": "Operations permitted for the default role (reads, formatting, federation, evaluation, subscription).",
+      "items": { "type": "string" }
+    },
+    "allow_admin": {
+      "type": "array",
+      "description": "Additional operations permitted for the admin role (ingestion, update, delete, admin status).",
+      "items": { "type": "string" }
+    }
+  },
+  "definitions": {
+    "PermissionDecision": {
+      "type": "string",
+      "description": "The auditable outcome of a permission check.",
+      "enum": ["allow", "deny"]
+    },
+    "PermissionResult": {
+      "type": "object",
+      "description": "Outcome of a permission check, populated for every call.",
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "decision": { "$ref": "#/definitions/PermissionDecision" },
+        "role": { "type": "string", "description": "Resolved role for the caller." },
+        "operation": { "type": "string", "description": "Operation that was checked." },
+        "graph_id": { "type": ["string", "null"], "description": "Target graph, echoed for audit." },
+        "reason": { "type": "string", "description": "Human-readable justification, including why a denial happened." }
+      },
+      "required": ["allowed", "decision", "role", "operation", "reason"]
+    }
+  }
+}

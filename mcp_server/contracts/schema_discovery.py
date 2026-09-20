@@ -8,6 +8,7 @@ are normalized into protocol models (:class:`GraphSchema`,
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -50,6 +51,7 @@ class SchemaDiscoveryContract:
         self._adapter: BaseGraphRAGAdapter = adapter
         self._ttl: float = max(0.0, float(ttl_seconds))
         self._cache: dict[CacheKey, _CachedValue] = {}
+        self._lock = threading.Lock()
 
     # -- public API -------------------------------------------------------------
 
@@ -130,7 +132,7 @@ class SchemaDiscoveryContract:
         if not entity_type:
             raise ValueError("entity_type must be a non-empty string")
         count = max(1, min(100, int(count)))
-        cache_key = ("sample", f"{entity_type}:{count}")
+        cache_key = ("sample", f"{graph_id or ''}:{entity_type}:{count}")
         cached = self._get(cache_key)
         if cached is not None:
             return cached
@@ -176,14 +178,15 @@ class SchemaDiscoveryContract:
         Returns:
             The cached value, or ``None`` if absent/expired.
         """
-        item = self._cache.get(key)
-        if item is None:
-            return None
-        stored_at, value = item
-        if time.monotonic() - stored_at > self._ttl:
-            self._cache.pop(key, None)
-            return None
-        return value
+        with self._lock:
+            item = self._cache.get(key)
+            if item is None:
+                return None
+            stored_at, value = item
+            if time.monotonic() - stored_at > self._ttl:
+                self._cache.pop(key, None)
+                return None
+            return value
 
     def _set(self, key: CacheKey, value: Any) -> None:
         """Store a value with the current timestamp.
@@ -192,7 +195,8 @@ class SchemaDiscoveryContract:
             key: The composite cache key.
             value: The value to cache.
         """
-        self._cache[key] = (time.monotonic(), value)
+        with self._lock:
+            self._cache[key] = (time.monotonic(), value)
 
     # -- normalization helpers --------------------------------------------------
 

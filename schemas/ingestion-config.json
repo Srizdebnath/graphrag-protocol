@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/ingestion-config.json",
+  "title": "IngestionConfig",
+  "description": "Contract 4: configuration for document -> knowledge-graph ingestion. Turns documents into a graph without rewriting extraction pipelines per backend. The response is an IngestionReport whose counters are measured from the backend, never estimated.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "graph_id": {
+      "type": "string",
+      "description": "Target graph identifier (TigerGraph graph name) to write into."
+    },
+    "document_type": {
+      "type": "string",
+      "description": "Document type driving the vertex/edge mapping (paper -> Paper/Author/Concept).",
+      "default": "paper"
+    },
+    "extraction": {
+      "$ref": "#/definitions/ExtractionStrategy",
+      "description": "How entities/concepts are extracted from document text.",
+      "default": "frequency"
+    },
+    "resolve": {
+      "$ref": "#/definitions/ResolveStrategy",
+      "description": "How extracted entities are matched against the existing graph.",
+      "default": "exact_id"
+    },
+    "max_concepts_per_doc": {
+      "type": "integer",
+      "description": "Upper bound on concepts extracted per document.",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 5
+    },
+    "embed_documents": {
+      "type": "boolean",
+      "description": "Also upsert into the PaperEmb vector vertex when embeddings are available.",
+      "default": false
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "Extract and resolve but do not write; the report reflects what WOULD happen and the graph is left untouched.",
+      "default": false
+    }
+  },
+  "required": ["graph_id"],
+  "definitions": {
+    "ExtractionStrategy": {
+      "type": "string",
+      "description": "frequency: deterministic stopword-filtered top-K tokens (no API). llm: Gemini concept extraction, degrading to frequency with a recorded reason on failure.",
+      "enum": ["frequency", "llm"]
+    },
+    "ResolveStrategy": {
+      "type": "string",
+      "description": "exact_id: an existing vertex is matched by id and its attributes are refreshed by the upsert. new_only: insert-only, an existing document/entity is never overwritten.",
+      "enum": ["exact_id", "new_only"]
+    },
+    "Triple": {
+      "type": "object",
+      "description": "A (subject, predicate, object) assertion extracted from a document.",
+      "properties": {
+        "subject_id": { "type": "string", "description": "Subject vertex id." },
+        "subject_type": { "type": "string", "default": "Paper" },
+        "predicate": { "type": "string", "description": "Edge type, e.g. MENTIONS, AUTHORED_BY, CITES." },
+        "object_id": { "type": "string", "description": "Object vertex id." },
+        "object_type": { "type": "string", "default": "Concept" },
+        "properties": { "type": "object", "description": "Resolution metadata (e.g. resolved: true). Never written as edge attributes." },
+        "source_doc": { "type": ["string", "null"], "description": "Originating document id." },
+        "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 1.0 }
+      },
+      "required": ["subject_id", "predicate", "object_id"]
+    },
+    "IngestionReport": {
+      "type": "object",
+      "description": "Outcome of an ingest/update/delete call. Every counter is measured against the backend.",
+      "properties": {
+        "protocol": { "type": "string", "enum": ["graphrag/1.0"], "default": "graphrag/1.0" },
+        "graph_id": { "type": "string" },
+        "document_ids": { "type": "array", "description": "Ids requested by the caller.", "items": { "type": "string" } },
+        "documents_written": { "type": "array", "description": "Ids actually written.", "items": { "type": "string" } },
+        "documents_created": { "type": "array", "description": "Written ids that did not exist before this call.", "items": { "type": "string" } },
+        "documents_deleted": { "type": "array", "description": "Ids actually removed.", "items": { "type": "string" } },
+        "documents_ingested": { "type": "integer", "description": "Number of documents written (len(documents_written)).", "default": 0 },
+        "documents_skipped": { "type": "integer", "description": "Documents left untouched (NEW_ONLY and already present).", "default": 0 },
+        "triples_extracted": { "type": "integer", "default": 0 },
+        "entities_created": { "type": "integer", "description": "Vertices created by this call.", "default": 0 },
+        "entities_resolved": { "type": "integer", "description": "Vertices matched to pre-existing ones.", "default": 0 },
+        "edges_created": { "type": "integer", "default": 0 },
+        "vertices_before": { "type": "object", "description": "Vertex counts per type before the call (measured).", "additionalProperties": { "type": "integer" } },
+        "vertices_after": { "type": "object", "description": "Vertex counts per type after the call (measured).", "additionalProperties": { "type": "integer" } },
+        "dry_run": { "type": "boolean", "default": false },
+        "errors": { "type": "array", "description": "Per-document failure reasons; never silently swallowed.", "items": { "type": "string" } },
+        "duration_ms": { "type": "number", "default": 0.0 }
+      },
+      "required": ["graph_id"]
+    }
+  }
+}

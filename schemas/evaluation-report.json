@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/evaluation-report.json",
+  "title": "EvaluationReport",
+  "description": "Contract 9: standardized, backend-comparable retrieval and answer metrics over a query set. Every number is measured: retrieval metrics come from the retrieved entities vs. the gold references, judge verdicts from a real LLM-as-judge call, and BERTScore only when the optional dependency is installed. Metrics that could not run are null (with a note) — never defaulted.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "UTC ISO-8601 timestamp of report generation.",
+      "format": "date-time"
+    },
+    "backend": {
+      "type": "string",
+      "description": "Backend the report was measured against (e.g. 'tigergraph').",
+      "default": "tigergraph"
+    },
+    "model": {
+      "type": ["string", "null"],
+      "description": "Answer model used, or null when answers were extractive (no LLM configured)."
+    },
+    "num_queries": {
+      "type": "integer",
+      "description": "Number of evaluated queries.",
+      "default": 0
+    },
+    "retrieval": {
+      "type": "array",
+      "description": "Per-query retrieval quality.",
+      "items": { "$ref": "#/definitions/RetrievalEval" }
+    },
+    "answers": {
+      "type": "array",
+      "description": "Per-query answer quality.",
+      "items": { "$ref": "#/definitions/AnswerEval" }
+    },
+    "avg_precision_at_k": {
+      "type": ["number", "null"],
+      "description": "Mean precision@k across queries; null when no query produced a measurement."
+    },
+    "avg_recall_at_k": {
+      "type": ["number", "null"],
+      "description": "Mean recall@k across queries; null when no query produced a measurement."
+    },
+    "judge_pass_rate": {
+      "type": ["number", "null"],
+      "description": "Share of judged answers that PASSed; null when no judge ran (no API key)."
+    },
+    "avg_bertscore_f1": {
+      "type": ["number", "null"],
+      "description": "Mean BERTScore F1 when the optional bert-score package is available; otherwise null."
+    },
+    "notes": {
+      "type": "array",
+      "description": "Explicit reasons for anything that could not be measured.",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["model"],
+  "definitions": {
+    "RetrievalEval": {
+      "type": "object",
+      "description": "Per-query retrieval quality against a reference answer.",
+      "properties": {
+        "query_id": { "type": "string" },
+        "precision_at_k": { "type": "number", "description": "Fraction of top-K entities matching the reference." },
+        "recall_at_k": { "type": "number", "minimum": 0.0, "maximum": 1.0, "description": "Fraction of reference terms covered by retrieved entities." },
+        "entities_retrieved": { "type": "integer" },
+        "graph_hops": { "type": "integer" },
+        "latency_ms": { "type": "number" }
+      },
+      "required": ["query_id", "precision_at_k", "recall_at_k", "entities_retrieved", "graph_hops", "latency_ms"]
+    },
+    "AnswerEval": {
+      "type": "object",
+      "description": "Per-query answer quality: LLM-as-judge plus optional BERTScore and a lexical grounding verdict.",
+      "properties": {
+        "query_id": { "type": "string" },
+        "judge_pass": { "type": ["boolean", "null"], "description": "LLM-as-judge verdict; null when no judge ran." },
+        "judge_reason": { "type": ["string", "null"] },
+        "judge_model": { "type": ["string", "null"] },
+        "bertscore_f1": { "type": ["number", "null"], "description": "BERTScore F1 vs reference; null when unavailable." },
+        "faithfulness": { "type": ["string", "null"], "description": "'grounded' | 'ungrounded' — whether the answer is backed by retrieved evidence." }
+      },
+      "required": ["query_id", "judge_pass", "bertscore_f1"]
+    }
+  }
+}

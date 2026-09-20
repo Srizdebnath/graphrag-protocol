@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://graphrag-protocol.org/schemas/stream-event.json",
+  "title": "StreamEvent",
+  "description": "Contract 7: real-time graph change notification. Events are emitted at the mutation point (ingestion/deletion) and delivered to subscribers through the in-process bus; the HTTP server exposes them as a live SSE feed and the MCP server replays recent events. A dry run publishes nothing.",
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "The protocol version identifier. Must be 'graphrag/1.0'.",
+      "enum": ["graphrag/1.0"],
+      "default": "graphrag/1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Unique, monotonically increasing event id assigned by the bus."
+    },
+    "event_type": {
+      "$ref": "#/definitions/StreamEventType",
+      "description": "The kind of mutation this event describes."
+    },
+    "graph_id": {
+      "type": "string",
+      "description": "Graph the mutation happened in."
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "UTC ISO-8601 timestamp of publication.",
+      "format": "date-time"
+    },
+    "entity_id": {
+      "type": ["string", "null"],
+      "description": "Vertex id the event refers to, when the mutation is vertex-scoped."
+    },
+    "entity_type": {
+      "type": ["string", "null"],
+      "description": "Vertex type the event refers to, e.g. 'Paper'."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Measured details of the mutation (counts from the ingestion report), never synthesized.",
+      "additionalProperties": true
+    }
+  },
+  "required": ["event_id", "event_type", "graph_id"],
+  "definitions": {
+    "StreamEventType": {
+      "type": "string",
+      "description": "Graph mutation event types. entity_*/edge_* map 1:1 onto a measured mutation; ingestion_completed always closes an ingest/update/delete call.",
+      "enum": [
+        "entity_created",
+        "entity_updated",
+        "entity_deleted",
+        "edge_created",
+        "edge_updated",
+        "community_recomputed",
+        "ingestion_completed"
+      ]
+    }
+  }
+}

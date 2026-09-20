@@ -21,9 +21,10 @@ Degradation fallbacks (never crash, never fabricate):
 from __future__ import annotations
 
 import os
+import re
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 from dotenv import load_dotenv
 
@@ -115,15 +116,50 @@ class TigerGraphAdapter(BaseGraphRAGAdapter):
             )
         return self._conn
 
-    def _install_queries(self) -> None:
-        """Install all GSQL queries idempotently (CREATE OR REPLACE)."""
+    def _installed_query_names(self) -> set[str]:
+        """Names of queries currently installed on the graph (real probe).
+
+        ``getInstalledQueries`` keys look like ``GET /query/<graph>/<Name>``.
+        Any probe failure returns an empty set, which simply means "install
+        everything" — the safe direction.
+        """
+        try:
+            installed = self.conn.getInstalledQueries()
+        except Exception:
+            return set()
+        names: set[str] = set()
+        for key in installed or {}:
+            name = str(key).rstrip("/").split("/")[-1].strip()
+            if name:
+                names.add(name)
+        return names
+
+    def _install_queries(self, force: bool = False) -> None:
+        """Install GSQL queries, skipping the ones already installed.
+
+        ``CREATE OR REPLACE QUERY`` + ``INSTALL QUERY`` compiles on the server
+        and can take minutes; probing the installed set first keeps a cold
+        first call in the seconds range instead of minutes.
+
+        Args:
+            force: Reinstall every query even when already present.
+        """
         conn = self.conn
-        for gsql in ALL_QUERIES.values():
+        wanted = set(ALL_QUERIES)
+        if not force:
+            wanted -= self._installed_query_names()
+            if not wanted:
+                self._queries_installed = True
+                return
+        for name in sorted(wanted):
             try:
-                conn.gsql(f"USE GRAPH {self._graphname}\n" + gsql, graphname=self._graphname)
+                conn.gsql(f"USE GRAPH {self._graphname}\n" + ALL_QUERIES[name], graphname=self._graphname)
             except Exception:
                 continue
-        conn.gsql(f"USE GRAPH {self._graphname}\nINSTALL QUERY {', '.join(ALL_QUERIES)}", graphname=self._graphname)
+        conn.gsql(
+            f"USE GRAPH {self._graphname}\nINSTALL QUERY {', '.join(sorted(wanted))}",
+            graphname=self._graphname,
+        )
         self._queries_installed = True
 
     def _run(
@@ -146,7 +182,7 @@ class TigerGraphAdapter(BaseGraphRAGAdapter):
             if not self._queries_installed:
                 raise
             self._queries_installed = False
-            self._install_queries()
+            self._install_queries(force=True)
             try:
                 return conn.runInstalledQuery(query_name, params)
             except Exception:
@@ -900,14 +936,45 @@ class TigerGraphAdapter(BaseGraphRAGAdapter):
                 return hit
         return None
 
+    # REST++ where-clause attributes per vertex type. Paper keys on id/title;
+    # Author and Concept use `name` as their primary-id attribute. Filtering on
+    # a non-existent attribute raises 609 ("invalid filter attributes"), so each
+    # candidate attribute is probed separately instead of OR-ed together.
+    _TYPE_FILTERS: ClassVar[dict[str, tuple[str, ...]]] = {
+        "Paper": ("id", "title"),
+        "Author": ("name",),
+        "Concept": ("name",),
+    }
+    _DEFAULT_FILTERS: ClassVar[tuple[str, ...]] = ("id", "name")
+
     @staticmethod
-    def _resolve_in_type(conn, name: str, vtype: str) -> tuple[str, str] | None:
-        try:
-            rows = conn.getVertices(vtype, where=f'id=="{name}" OR name=="{name}"', limit=1)
-            if rows:
-                return str(rows[0]["v_id"]), vtype
-        except Exception:
+    def _escape_where(value: str) -> str:
+        """Escape a value for a REST++ where-clause string literal."""
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
+    @classmethod
+    def _resolve_in_type(cls, conn, name: str, vtype: str) -> tuple[str, str] | None:
+        """Resolve a name/id to ``(v_id, vtype)`` within one vertex type.
+
+        Tries each type-appropriate attribute, then a lowercased variant so
+        ``Attention`` finds the stored ``attention`` concept.
+        """
+        if not vtype or not re.match(r"^[a-zA-Z0-9_]{1,64}$", vtype):
             return None
+        attrs = cls._TYPE_FILTERS.get(vtype, cls._DEFAULT_FILTERS)
+        candidates = [name]
+        lowered = name.lower()
+        if lowered != name:
+            candidates.append(lowered)
+        for value in candidates:
+            safe = cls._escape_where(value)
+            for attr in attrs:
+                try:
+                    rows = conn.getVertices(vtype, where=f'{attr}=="{safe}"', limit=1)
+                except Exception:
+                    continue
+                if rows:
+                    return str(rows[0]["v_id"]), vtype
         return None
 
     @staticmethod

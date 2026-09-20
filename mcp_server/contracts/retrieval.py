@@ -92,9 +92,11 @@ class RetrievalContract(BaseRetrievalContract):
         if provenance is None:
             provenance = self._derive_provenance(results)
         if metrics is None:
+            hops = int(query_echo.get("depth", 0)) if isinstance(query_echo, dict) else 0
             metrics = self._derive_metrics(
                 results=results,
                 input_tokens=len(str(query_echo)),
+                hops=hops,
             )
             if raw_metrics is not None:
                 metrics = metrics.model_copy(
@@ -113,36 +115,27 @@ class RetrievalContract(BaseRetrievalContract):
             metrics=metrics,
         )
 
-    @staticmethod
-    def _derive_provenance(results: dict[str, Any]) -> Provenance:
-        """Build a minimal provenance from the result envelope.
-
-        Args:
-            results: The result sub-dict of a context.
-
-        Returns:
-            A provenance with source documents and counters derived from
-            the retrieved entities/chunks.
-        """
-        entities: list[Any] = results.get("entities", []) or []
-        chunks: list[Any] = results.get("text_chunks", []) or []
-        source_docs: list[str] = []
-        for chunk in chunks:
-            source_doc = chunk.get("source_doc") if isinstance(chunk, dict) else getattr(chunk, "source_doc", None)
-            if source_doc and source_doc not in source_docs:
-                source_docs.append(source_doc)
+    def _derive_provenance(self, results: dict[str, Any]) -> Provenance:
+        """Derive minimal provenance when the backend produces none."""
+        entities = results.get("entities", []) or []
+        chunks = results.get("text_chunks", []) or []
+        source_docs: set[str] = set()
+        for c in chunks:
+            if isinstance(c, dict) and c.get("source_doc"):
+                source_docs.add(str(c["source_doc"]))
         return Provenance(
-            source_documents=source_docs,
+            source_documents=sorted(source_docs),
             total_entities_examined=len(entities),
+            total_chunks_examined=len(chunks),
             total_chunks_returned=len(chunks),
-            backend="unknown",
         )
 
-    @staticmethod
     def _derive_metrics(
+        self,
         results: dict[str, Any],
-        input_tokens: int = 0,
+        input_tokens: int,
         latency_ms: float = 0.0,
+        hops: int = 0,
     ) -> RetrievalMetrics:
         """Compute standard metrics from the result envelope.
 
@@ -150,6 +143,7 @@ class RetrievalContract(BaseRetrievalContract):
             results: The result sub-dict of a context.
             input_tokens: Tokens consumed by the request text.
             latency_ms: End-to-end latency in milliseconds.
+            hops: Graph hops traversed (from depth or path).
 
         Returns:
             A populated :class:`RetrievalMetrics`.
@@ -160,7 +154,7 @@ class RetrievalContract(BaseRetrievalContract):
             relationships_returned=len(results.get("relationships", []) or []),
             paths_found=len(results.get("paths", []) or []),
             communities_matched=len(results.get("communities", []) or []),
-            graph_hops_traversed=len(results.get("entities", []) or []),
+            graph_hops_traversed=hops,
             latency_ms=latency_ms,
         )
 

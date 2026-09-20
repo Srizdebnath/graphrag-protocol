@@ -394,3 +394,41 @@ class RetrievalResult(BaseModel):
         default=None,
         description="Optional pre-formatted text representation.",
     )
+
+
+class PromptFormat(str, Enum):
+    """Supported text serialization formats for Contract 8."""
+
+    MARKDOWN = "markdown"
+    STRUCTURED = "structured"
+    NONE = "none"
+
+
+class PromptFormatConfig(BaseModel):
+    """Contract 8: Configuration for formatting SubgraphContext for LLM consumption.
+
+    Enables token budgeting, citation styles, and section filtering.
+    """
+
+    format: PromptFormat = Field(
+        default=PromptFormat.MARKDOWN,
+        description="Target format: markdown, structured, or none.",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        ge=64,
+        le=32768,
+        description="Maximum token budget for the formatted text.",
+    )
+    include_citations: bool = Field(
+        default=True,
+        description="Whether to include inline citations and provenance footers.",
+    )
+    include_metrics: bool = Field(
+        default=True,
+        description="Whether to append execution metrics to the output.",
+    )
+    include_provenance: bool = Field(
+        default=True,
+        description="Whether to include source documents and traversal trajectories.",
+    )
