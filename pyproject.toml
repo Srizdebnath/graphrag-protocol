@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grip-protocol"
-version = "0.1.0"
-description = "Universal GraphRAG Interoperability Protocol (GRIP) — 27-tool MCP server, verifiable provenance, and standard contracts for knowledge graph RAG"
+version = "0.2.0"
+description = "Universal GraphRAG Interoperability Protocol (GRIP) — 42-tool MCP server, 15 contracts, verifiable provenance, and standard contracts for knowledge graph RAG"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

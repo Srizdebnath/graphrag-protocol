@@ -49,6 +49,7 @@ from mcp_server.protocol_extensions import (
 )
 
 _DEFAULT_MAX_TOKENS = 4096
+_DEFAULT_EXTRACTION_STRATEGY = os.environ.get('GRAPHRAG_EXTRACTION', 'frequency')
 
 
 def _adapter() -> Any:
@@ -159,10 +160,10 @@ def _json(obj: Any) -> str:
 
 
 def build_server() -> MCPServer:
-    """Construct the MCP server with all 27 tools registered."""
+    """Construct the MCP server with all 42 tools registered."""
     mcp = MCPServer(
         name="grip",
-        version="0.1.0",
+        version="0.2.0",
         instructions=(
             "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
             "Use graphrag_search for natural-language queries (auto-routes to "
@@ -389,7 +390,10 @@ def build_server() -> MCPServer:
         format_text: str = "markdown",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = SubgraphContext(**context)
+        try:
+            ctx = SubgraphContext(**context)
+        except ValueError as exc:
+            return _json({"error": f"Invalid context: {exc}"})
         if format_text.lower() in ("structured", "json"):
             return STATE._structured.format_context(ctx, max_tokens=max_tokens)
         return STATE._markdown.format_context(ctx, max_tokens=max_tokens)
@@ -565,15 +569,18 @@ def build_server() -> MCPServer:
             "(Contract 9): precision@k, recall@k, LLM-as-judge and grounding."
         ),
     )
-    def graphrag_evaluate(limit: int = 5, mode: str = "auto", pipeline: str = "graphrag") -> str:
+    def graphrag_evaluate(limit: int = 5, mode: str = "auto", pipeline: str = "graphrag", references_path: str | None = None) -> str:
         from mcp_server.pipelines import load_query_set
 
         references: dict[str, str] = {}
-        try:
-            with open("hackathon/data/queries/reference_answers.json") as handle:
-                references = json.load(handle)
-        except Exception as exc:  # noqa: BLE001 - references are optional
-            print(f"[mcp_server] references unavailable ({type(exc).__name__})", file=sys.stderr)
+        if references_path:
+            try:
+                with open(references_path) as handle:
+                    references = json.load(handle)
+            except FileNotFoundError:
+                pass
+            except Exception as exc:  # noqa: BLE001 - references are optional
+                print(f"[mcp_server] references unavailable ({type(exc).__name__})", file=sys.stderr)
         try:
             query_set = [
                 {**item, "reference": references.get(item["id"], "")}
@@ -598,6 +605,225 @@ def build_server() -> MCPServer:
                 "allowed_operations": STATE.authorization.get_allowed_operations(token=admin_token),
             }
         )
+
+    # ------------------------------------------------------------------
+    # Contract 11 — Semantic Similarity
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_similarity",
+        title="Semantic similarity",
+        description="Compute cosine (vector) or Jaccard (lexical) similarity between two text blobs or entity IDs.",
+    )
+    def graphrag_similarity(text_a: str, text_b: str) -> str:
+        from mcp_server.contracts.similarity import SimilarityContract
+        return _json(SimilarityContract(STATE.adapter).similarity(text_a, text_b))
+
+    @mcp.tool(
+        name="graphrag_entity_similarity",
+        title="Entity semantic similarity",
+        description="Compare two entities by id using their names and properties text.",
+    )
+    def graphrag_entity_similarity(entity_id_a: str, entity_id_b: str) -> str:
+        from mcp_server.contracts.similarity import SimilarityContract
+        return _json(SimilarityContract(STATE.adapter).entity_similarity(entity_id_a, entity_id_b))
+
+    @mcp.tool(
+        name="graphrag_batch_similarity",
+        title="Batch similarity ranking",
+        description="Rank a list of candidate texts by similarity to an anchor text, highest first.",
+    )
+    def graphrag_batch_similarity(anchor: str, candidates: list[str]) -> str:
+        from mcp_server.contracts.similarity import SimilarityContract
+        return _json(SimilarityContract(STATE.adapter).batch_similarity(anchor, candidates))
+
+    # ------------------------------------------------------------------
+    # Contract 12 — Temporal Query
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_temporal_search",
+        title="Temporal search",
+        description="Retrieve entities filtered by a date range (start/end ISO-8601). Filters on published, created_at, updated_at attributes.",
+    )
+    def graphrag_temporal_search(
+        query: str,
+        start: str | None = None,
+        end: str | None = None,
+        mode: str = "auto",
+        top_k: int = 10,
+        depth: int = 2,
+        format_text: str = "none",
+        max_tokens: int = _DEFAULT_MAX_TOKENS,
+    ) -> str:
+        from mcp_server.contracts.temporal import TemporalContract
+        ctx = TemporalContract(STATE.adapter).temporal_search(
+            query=query, start=start, end=end, mode=mode, top_k=top_k, depth=depth
+        )
+        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+
+    # ------------------------------------------------------------------
+    # Contract 13 — Explanation
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_explain",
+        title="Explain retrieval",
+        description="Generate natural-language explanations for why each entity was retrieved in a SubgraphContext.",
+    )
+    def graphrag_explain(
+        context: dict[str, Any],
+        max_entities: int = 10,
+    ) -> str:
+        from mcp_server.contracts.explanation import ExplanationContract
+        try:
+            ctx = SubgraphContext(**context)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context: {exc}"})
+        return _json(ExplanationContract(STATE.adapter).explain(ctx, max_entities=max_entities))
+
+    @mcp.tool(
+        name="graphrag_explain_path",
+        title="Explain path",
+        description="Explain the reasoning behind each path found in a path_search SubgraphContext.",
+    )
+    def graphrag_explain_path(context: dict[str, Any]) -> str:
+        from mcp_server.contracts.explanation import ExplanationContract
+        try:
+            ctx = SubgraphContext(**context)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context: {exc}"})
+        return _json(ExplanationContract(STATE.adapter).explain_path(ctx))
+
+    # ------------------------------------------------------------------
+    # Contract 14 — Diff
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_diff",
+        title="Context diff",
+        description="Compare two SubgraphContext envelopes and return the structural delta (entities added/removed, relationships changed).",
+    )
+    def graphrag_diff(
+        context_a: dict[str, Any],
+        context_b: dict[str, Any],
+        label_a: str = "a",
+        label_b: str = "b",
+    ) -> str:
+        from mcp_server.contracts.diff import DiffContract
+        try:
+            ctx_a = SubgraphContext(**context_a)
+            ctx_b = SubgraphContext(**context_b)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context: {exc}"})
+        return _json(DiffContract(STATE.adapter).diff_contexts(ctx_a, ctx_b, label_a=label_a, label_b=label_b))
+
+    @mcp.tool(
+        name="graphrag_diff_queries",
+        title="Query diff",
+        description="Run two different queries and return the diff of their result sets.",
+    )
+    def graphrag_diff_queries(
+        query_a: str,
+        query_b: str,
+        mode: str = "auto",
+        top_k: int = 10,
+        depth: int = 2,
+    ) -> str:
+        from mcp_server.contracts.diff import DiffContract
+        return _json(DiffContract(STATE.adapter).diff_queries(query_a=query_a, query_b=query_b, mode=mode, top_k=top_k, depth=depth))
+
+    # ------------------------------------------------------------------
+    # Contract 15 — Aggregate
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_count",
+        title="Count entities",
+        description="Count entities of a given type, optionally with attribute filters. Uses schema stats (real backend counts).",
+    )
+    def graphrag_count(
+        entity_type: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> str:
+        from mcp_server.contracts.aggregate import AggregateContract
+        return _json(AggregateContract(STATE.adapter).count(entity_type=entity_type, filters=filters))
+
+    @mcp.tool(
+        name="graphrag_group_by",
+        title="Group entities by attribute",
+        description="Group entities of a type by an attribute and return counts per group.",
+    )
+    def graphrag_group_by(
+        entity_type: str,
+        attribute: str,
+        top_n: int = 20,
+    ) -> str:
+        from mcp_server.contracts.aggregate import AggregateContract
+        return _json(AggregateContract(STATE.adapter).group_by(entity_type=entity_type, attribute=attribute, top_n=top_n))
+
+    @mcp.tool(
+        name="graphrag_top_n",
+        title="Top-N entities by attribute",
+        description="Return top-N entities of a type ranked by a numeric attribute value.",
+    )
+    def graphrag_top_n(
+        entity_type: str,
+        rank_by: str,
+        n: int = 10,
+        descending: bool = True,
+    ) -> str:
+        from mcp_server.contracts.aggregate import AggregateContract
+        return _json(AggregateContract(STATE.adapter).top_n(entity_type=entity_type, rank_by=rank_by, n=n, descending=descending))
+
+    @mcp.tool(
+        name="graphrag_stats_summary",
+        title="Graph statistics summary",
+        description="Comprehensive statistics: vertex/edge counts by type, density, connected components.",
+    )
+    def graphrag_stats_summary() -> str:
+        from mcp_server.contracts.aggregate import AggregateContract
+        return _json(AggregateContract(STATE.adapter).stats_summary())
+
+    @mcp.tool(
+        name="graphrag_job_status",
+        title="Ingestion job status",
+        description="Check the status of a background ingestion job started with async_mode=True.",
+    )
+    def graphrag_job_status(job_id: str) -> str:
+        # Job registry is stored in STATE; jobs are dict entries added by async ingest
+        jobs = getattr(STATE, "_jobs", {})
+        if job_id in jobs:
+            return _json(jobs[job_id])
+        return _json({"job_id": job_id, "status": "not_found", "error": "Unknown job id"})
+
+    @mcp.tool(
+        name="graphrag_register_backend",
+        title="Register federated backend",
+        description="Register a named backend adapter for federated queries (Contract 6). Returns the BackendRef.",
+    )
+    def graphrag_register_backend(
+        name: str,
+        graph_id: str,
+        weight: float = 1.0,
+        admin_token: str | None = None,
+    ) -> str:
+        decision = STATE.authorization.check_permission("ingest", token=admin_token)
+        if not decision.allowed:
+            return _json({"error": "permission denied", **decision.model_dump()})
+        ref = STATE.federation.register_backend(name=name, weight=weight)
+        return _json(ref.model_dump())
+
+    @mcp.tool(
+        name="graphrag_audit_log",
+        title="Audit log",
+        description="Return recent write operations (ingest/delete) from the streaming event bus, filtered to mutation events.",
+    )
+    def graphrag_audit_log(limit: int = 50) -> str:
+        mutation_types = {"entity_created", "entity_updated", "entity_deleted", "edge_created", "ingestion_completed"}
+        events = STREAM_BUS.recent(max(1, min(limit, 500)))
+        audit = [e.model_dump(mode="json") for e in events if e.event_type.value in mutation_types]
+        return _json({"total": len(audit), "events": audit})
 
     return mcp
 

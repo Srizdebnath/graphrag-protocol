@@ -1,6 +1,6 @@
 # GraphRAG Protocol — Specification
 
-**Version:** 1.0 · **Status:** Draft · **License:** MIT
+**Version:** 1.1 · **Status:** Draft · **License:** MIT
 
 > **Universal GraphRAG Interoperability Protocol.** Standard contracts, a reference MCP server, and pluggable adapters so *any agent can query any GraphRAG backend uniformly*.
 
@@ -23,14 +23,14 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
           +--------->|  GraphRAG      |<-------+
                      |  Interoperability
                      |  Protocol (this)
-                     |  + contracts
-                     |  + MCP server
+                     |  + 15 contracts
+                     |  + 42-tool MCP server
                      |  + adapters
                      +----------------+
 </pre>
 
 - **GQL** standardizes *how to query any graph* — but it returns raw graph primitives, not retrieval semantics (relevance scoring, provenance, community-level reasoning).
-- **MCP** standardizes *how any agent connects to any tool* — but it says nothing about GraphRAG opereration signatures, response shape, or citations.
+- **MCP** standardizes *how any agent connects to any tool* — but it says nothing about GraphRAG operation signatures, response shape, or citations.
 - **GraphRAG Protocol** standardizes the *retrieval contract between the two*: a uniform request (`RetrievalRequest`), a uniform response (`SubgraphContext`), provenance, schema discovery, and evaluation.
 
 ### Why this matters
@@ -39,10 +39,12 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 2. **Token efficiency.** The standard context format forces adapters to return only the subgraph needed to answer, cutting prompt tokens versus vector-RAG baselines.
 3. **Auditability.** The provenance contract (Contract 5) makes every answer traceable to source documents — including which entities were *visited but not cited*, enabling trajectory-completeness audits.
 4. **Vendor-neutral evaluation.** Because all backends emit the same `RetrievalMetrics`, backends can be benchmarked on identical queries with identical scoring.
+5. **Interpretability.** The explanation contract (Contract 13) tells agents *why* each entity was retrieved, turning a black box into an explainable retrieval system.
+6. **Temporal reasoning.** The temporal contract (Contract 12) lets agents filter any subgraph by date range — essential for news, financial, and medical graphs.
 
 ---
 
-## 2. The 10 Contracts
+## 2. The 15 Contracts
 
 | # | Contract | Purpose | JSON Schema | Status |
 |---|----------|---------|-------------|--------|
@@ -56,6 +58,13 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 | 8 | **Prompt Formatting** `PromptFormatConfig` | Context → LLM-ready text | `schemas/prompt-format-config.json` | Detailed in §7 |
 | 9 | **Evaluation** `EvaluationReport` | Standard retrieval/answer metrics | `schemas/evaluation-report.json` | Summarized in §10.4 |
 | 10 | **Authorization** `AccessPolicy` | Per-operation permission model | `schemas/access-policy.json` | Summarized in §10.5 |
+| 11 | **Semantic Similarity** | Cosine + Jaccard similarity between entities or text | — | `contracts/similarity.py` |
+| 12 | **Temporal Query** | Date-range filtering over retrieved subgraphs | — | `contracts/temporal.py` |
+| 13 | **Explanation** | Natural-language "why retrieved" narrative per entity | — | `contracts/explanation.py` |
+| 14 | **Diff** | Structural delta between two SubgraphContexts | — | `contracts/diff.py` |
+| 15 | **Aggregate** | OLAP-style count, group-by, top-N, stats summary | — | `contracts/aggregate.py` |
+
+
 
 ---
 
@@ -366,12 +375,16 @@ Abstract interfaces in `mcp_server/contracts/base.py` (`BaseRetrievalContract`),
 ## 9. Architecture
 
 ```
-Agents (LangGraph, CrewAI, custom)  │  MCP server (27 tools)  │  Protocol contracts  │  Adapters  │  Backends
+Agents (LangGraph, CrewAI, custom)  │  MCP server (42 tools)  │  Protocol contracts  │  Adapters  │  Backends
            │                        │        graphrag_search        │   retrieval        │  TigerGraph│
            │                        │        graphrag_entity         │   schema           │  Neo4j     │
            │      (MCP)             │        graphrag_path           │   provenance  ◄───►│  LightRAG  │
-           └────────────────────────►        graphrag_neighborhood   │   construction     │  ChromaDB  │
-                                            ... 27 tools ...         │   federation       │  ...       │
+           └────────────────────────►        graphrag_similarity     │   construction     │  ChromaDB  │
+                                             graphrag_temporal        │   similarity       │  ...       │
+                                             graphrag_explain          │   explanation                  │
+                                             graphrag_diff             │   diff                         │
+                                             graphrag_count            │   aggregate                    │
+                                             ... 42 tools ...         │                                │
 ```
 
 ---

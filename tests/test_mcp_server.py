@@ -1,6 +1,6 @@
 """MCP server tests — in-memory, real tools, demo adapter, zero network.
 
-Verifies the MCP layer itself: tool registration (all 16 protocol tools),
+Verifies the MCP layer itself: tool registration (all 42 protocol tools),
 invocation through the contract layer, JSON envelope shape, formatting and
 admin tools. The TigerGraph adapter is bypassed by injecting the demo
 adapter into the shared state, so these run hermetically; live-backend
@@ -35,11 +35,12 @@ def _call(server, name: str, arguments: dict) -> dict:
     return json.loads(result.content[0].text)
 
 
-def test_registers_all_27_protocol_tools(server):
+def test_registers_all_42_protocol_tools(server):
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
-    assert len(names) == 27
-    expected = {
+    assert len(names) == 42
+    # Original 27 tools
+    original_27 = {
         "graphrag_search",
         "graphrag_local_search",
         "graphrag_global_search",
@@ -68,6 +69,25 @@ def test_registers_all_27_protocol_tools(server):
         "graphrag_evaluate",
         "graphrag_authorize",
     }
+    # New 15 tools (Contracts 11-15 + admin extensions)
+    new_15 = {
+        "graphrag_similarity",
+        "graphrag_entity_similarity",
+        "graphrag_batch_similarity",
+        "graphrag_temporal_search",
+        "graphrag_explain",
+        "graphrag_explain_path",
+        "graphrag_diff",
+        "graphrag_diff_queries",
+        "graphrag_count",
+        "graphrag_group_by",
+        "graphrag_top_n",
+        "graphrag_stats_summary",
+        "graphrag_job_status",
+        "graphrag_register_backend",
+        "graphrag_audit_log",
+    }
+    expected = original_27 | new_15
     assert names == expected
 
 
@@ -129,3 +149,72 @@ def test_unknown_tool_raises(server):
 
     with pytest.raises(ToolError):
         asyncio.run(server.call_tool("graphrag_nonexistent", {}))
+
+
+def test_new_similarity_tools(server):
+    res = _call(server, "graphrag_similarity", {"text_a": "attention transformer", "text_b": "attention mechanism"})
+    assert "score" in res
+    assert 0.0 <= res["score"] <= 1.0
+
+    res2 = _call(server, "graphrag_entity_similarity", {"entity_id_a": "paper:bert", "entity_id_b": "paper:attention"})
+    assert "score" in res2
+    assert res2["entity_a"] == "paper:bert"
+
+    res3 = _call(server, "graphrag_batch_similarity", {"anchor": "transformer", "candidates": ["attention", "biology"]})
+    assert len(res3) == 2
+
+
+def test_new_temporal_tool(server):
+    res = _call(server, "graphrag_temporal_search", {"query": "transformer", "start": "2017-01-01", "end": "2024-01-01"})
+    assert res["operation"] == "temporal_search"
+    assert "entities" in res["results"]
+
+
+def test_new_explanation_tools(server):
+    ctx = _call(server, "graphrag_search", {"query": "transformer", "mode": "local"})
+    exp = _call(server, "graphrag_explain", {"context": ctx})
+    assert "explanations" in exp
+    assert "traversal_summary" in exp
+
+    path_ctx = _call(server, "graphrag_path", {"source": "paper:attention", "target": "concept:transformer"})
+    exp_path = _call(server, "graphrag_explain_path", {"context": path_ctx})
+    assert "paths" in exp_path
+
+
+def test_new_diff_tools(server):
+    ctx_a = _call(server, "graphrag_search", {"query": "transformer", "mode": "local"})
+    ctx_b = _call(server, "graphrag_search", {"query": "bert", "mode": "local"})
+    d = _call(server, "graphrag_diff", {"context_a": ctx_a, "context_b": ctx_b})
+    assert "entities" in d
+    assert "summary" in d
+
+    dq = _call(server, "graphrag_diff_queries", {"query_a": "transformer", "query_b": "bert"})
+    assert "entities" in dq
+    assert "summary" in dq
+
+
+def test_new_aggregate_tools(server):
+    count_res = _call(server, "graphrag_count", {"entity_type": "Paper"})
+    assert "count" in count_res
+
+    group_res = _call(server, "graphrag_group_by", {"entity_type": "Paper", "attribute": "year"})
+    assert "groups" in group_res
+
+    top_res = _call(server, "graphrag_top_n", {"entity_type": "Paper", "rank_by": "year", "n": 2})
+    assert "entities" in top_res
+
+    stats = _call(server, "graphrag_stats_summary", {})
+    assert "total_vertices" in stats
+
+
+def test_new_admin_and_job_tools(server, monkeypatch):
+    status = _call(server, "graphrag_job_status", {"job_id": "nonexistent_job"})
+    assert status["status"] == "not_found"
+
+    monkeypatch.setenv("GRAPHRAG_ADMIN_TOKEN", "test_admin_token")
+    reg = _call(server, "graphrag_register_backend", {"name": "test_be", "graph_id": "demo_graph", "admin_token": "test_admin_token"})
+    assert reg["name"] == "test_be"
+
+    audit = _call(server, "graphrag_audit_log", {"limit": 10})
+    assert "events" in audit
+
