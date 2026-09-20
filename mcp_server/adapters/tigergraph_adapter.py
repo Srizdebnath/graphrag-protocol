@@ -967,8 +967,21 @@ class TigerGraphAdapter(BaseGraphRAGAdapter):
         if lowered != name:
             candidates.append(lowered)
         for value in candidates:
+            # 1. Fast O(1) primary-key lookup (Concept.name, Author.name, Paper.id)
+            try:
+                rows = conn.getVerticesById(vtype, value)
+                if rows:
+                    return str(rows[0]["v_id"]), vtype
+            except Exception:
+                pass
+
+            # 2. Secondary attribute check only when applicable
             safe = cls._escape_where(value)
             for attr in attrs:
+                if attr in ("id", "name"):
+                    continue  # Already checked via getVerticesById above
+                if attr == "title" and " " not in value:
+                    continue  # Skip expensive 31k-row scans on single tokens
                 try:
                     rows = conn.getVertices(vtype, where=f'{attr}=="{safe}"', limit=1)
                 except Exception:
