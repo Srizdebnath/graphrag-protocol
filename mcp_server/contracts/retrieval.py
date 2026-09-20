@@ -467,13 +467,11 @@ class RetrievalContract(BaseRetrievalContract):
         return RetrievalResult(context=context, formatted=None)
 
     def classify_query(self, query: str) -> str:
-        """Classify a query into a retrieval mode by lightweight heuristics.
+        """Classify a query into a retrieval mode using semantic intent scoring.
 
-        Lowercased text is matched against phrase patterns:
-
-        - Global summarisation phrases -> ``'global'``.
-        - Bare, short entity-like tokens -> ``'entity'``.
-        - Otherwise -> ``'hybrid'``.
+        Uses vector cosine similarity against retrieval mode prototype centroids
+        when embeddings are supported by the adapter, with fallback to term-vector
+        cosine scoring over semantic intent lexicons.
 
         Args:
             query: The query text to classify.
@@ -481,24 +479,78 @@ class RetrievalContract(BaseRetrievalContract):
         Returns:
             One of ``'global'``, ``'entity'``, or ``'hybrid'``.
         """
+        import math
+        import re
+
         text = query.strip().lower()
+        if not text:
+            return "hybrid"
 
-        global_patterns = (
-            "what are the main themes",
-            "overall",
-            "main themes",
-            "summarize",
-            "trends",
-            "summarise",
-            "what's the big picture",
-            "overview of the field",
-            "key developments",
-        )
-        if any(p in text for p in global_patterns):
-            return "global"
-
-        if len(text.split()) <= 4 and not text.endswith("?"):
+        # Check for bare entity names (1-3 words, no punctuation/question words)
+        words = text.split()
+        if len(words) <= 3 and not any(w in text for w in ("what", "why", "how", "when", "where", "which", "?")):
             return "entity"
+
+        # Semantic intent centroids
+        centroids = {
+            "global": {
+                "theme", "themes", "overview", "overall", "summary", "summarize", "summarise",
+                "trends", "trend", "picture", "landscape", "field", "corpus", "broad", "developments",
+                "macro", "general", "all", "across",
+            },
+            "path": {
+                "path", "between", "connect", "connection", "link", "relationship", "relate",
+                "bridge", "intermediate", "route", "chain",
+            },
+            "local": {
+                "specific", "detail", "details", "metric", "score", "citation", "cites",
+                "mechanism", "architecture", "component", "property", "attribute",
+            },
+        }
+
+        # Query token set
+        query_tokens = set(re.findall(r"[a-z0-9\-]{3,}", text))
+        if not query_tokens:
+            return "hybrid"
+
+        # Try vector embedding similarity if adapter provides embed_text
+        embed_fn = getattr(self._adapter, "embed_text", None)
+        if callable(embed_fn):
+            try:
+                q_vec = embed_fn(text)
+                if q_vec:
+                    best_mode = "hybrid"
+                    best_sim = 0.0
+                    prototypes = {
+                        "global": "Comprehensive summary of overall themes and trends across all papers",
+                        "local": "Specific details, direct citations, and technical properties of an entity",
+                        "path": "Shortest connection and relationship path between two entities",
+                    }
+                    for mode, proto_text in prototypes.items():
+                        p_vec = embed_fn(proto_text)
+                        if p_vec and len(p_vec) == len(q_vec):
+                            dot = sum(a * b for a, b in zip(q_vec, p_vec))
+                            mag_q = math.sqrt(sum(a * a for a in q_vec))
+                            mag_p = math.sqrt(sum(b * b for b in p_vec))
+                            sim = dot / (mag_q * mag_p) if (mag_q * mag_p) > 0 else 0.0
+                            if sim > best_sim:
+                                best_sim = sim
+                                best_mode = mode
+                    if best_sim > 0.65:
+                        return best_mode
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+        # Real lexical cosine similarity against semantic centroids
+        scores = {}
+        for mode, terms in centroids.items():
+            overlap = len(query_tokens & terms)
+            sim = overlap / math.sqrt(len(query_tokens) * len(terms))
+            scores[mode] = sim
+
+        best_lexical_mode, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score > 0.15:
+            return best_lexical_mode
 
         return "hybrid"
 

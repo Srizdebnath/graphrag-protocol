@@ -1,43 +1,49 @@
-"""GraphRAG Protocol — real MCP server (mcp SDK v2, stdio transport).
+"""GraphRAG Protocol — real MCP server (mcp SDK v2, stdio & streamable-http transports).
 
-Exposes the protocol contracts (retrieval, schema discovery, provenance,
-formatting) as MCP tools so ANY MCP client — Claude Desktop, Claude Code,
-LangGraph, CrewAI — can query ANY GraphRAG backend uniformly.
+Exposes all 18 protocol contracts (retrieval, schema discovery, provenance,
+construction, federation, streaming, formatting, evaluation, authorization,
+similarity, temporal, explanation, diff, aggregation, export, batch, watch)
+as 47 MCP tools, browseable MCP resources, and prompt templates.
+
+Any MCP client — Claude Desktop, Claude Code, LangGraph, Cursor, CrewAI —
+can query any GraphRAG backend uniformly.
 
 Run:
-    python -m mcp_server.mcp_server          # or the `graphrag-mcp` script
-
-Design notes:
-- One shared adapter (TigerGraph when configured + healthy, else demo).
-- One shared `RetrievalContract`/`SchemaDiscoveryContract`/`ProvenanceContract`
-  layer over that adapter; every tool goes through the contracts, so parameter
-  validation and response normalization are enforced uniformly.
-- Tools return compact JSON: the structured contract of the protocol, plus
-  ``formatted`` text from Contract 8 formatters when asked.
-- The adapter is lazy: creating the server never opens a connection. First
-  tool call instantiates it; TigerGraph failures at first use degrade to the
-  demo adapter (logged to stderr; stdout stays MCP-framing-clean).
+    python -m mcp_server.mcp_server                            # stdio transport
+    python -m mcp_server.mcp_server --transport streamable-http # HTTP/SSE transport
 """
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 import json
 import os
 import sys
+import uuid
 from typing import Any
 
 from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
 
-from mcp_server.adapters import DemoGraphRAGAdapter, TigerGraphAdapter
+from mcp_server.adapters import DemoGraphRAGAdapter, Neo4jGraphRAGAdapter, TigerGraphAdapter
+from mcp_server.cache import QueryCache
+from mcp_server.contracts.aggregate import AggregateContract
 from mcp_server.contracts.authorization import AuthorizationContract
+from mcp_server.contracts.batch import BatchContract
 from mcp_server.contracts.construction import ConstructionContract
+from mcp_server.contracts.diff import DiffContract
 from mcp_server.contracts.evaluation import EvaluationContract
+from mcp_server.contracts.explanation import ExplanationContract
+from mcp_server.contracts.export import ExportContract
 from mcp_server.contracts.federation import FederationContract
 from mcp_server.contracts.provenance import ProvenanceContract
 from mcp_server.contracts.retrieval import RetrievalContract
 from mcp_server.contracts.schema_discovery import SchemaDiscoveryContract
+from mcp_server.contracts.similarity import SimilarityContract
 from mcp_server.contracts.streaming import STREAM_BUS
+from mcp_server.contracts.temporal import TemporalContract
+from mcp_server.contracts.watch import WatchContract
 from mcp_server.formatters import MarkdownFormatter, StructuredFormatter
 from mcp_server.protocol import SubgraphContext
 from mcp_server.protocol_extensions import (
@@ -45,33 +51,45 @@ from mcp_server.protocol_extensions import (
     FederationConfig,
     IngestionConfig,
     MergeStrategy,
-    StreamEventType,
 )
+from mcp_server.rate_limiter import RateLimiter
+from mcp_server.storage import PersistentStorage
 
 _DEFAULT_MAX_TOKENS = 4096
-_DEFAULT_EXTRACTION_STRATEGY = os.environ.get('GRAPHRAG_EXTRACTION', 'frequency')
+_DEFAULT_EXTRACTION_STRATEGY = os.environ.get("GRAPHRAG_EXTRACTION", "frequency")
+
+# In-memory cursor storage for graphrag_next_page
+_CURSORS: dict[str, dict[str, Any]] = {}
 
 
 def _adapter() -> Any:
-    """Pick the best available adapter without crashing at import time.
+    """Pick the best available real adapter without crashing at import time.
 
-    TigerGraph wins when credentials are present and the workspace answers a
-    health check; otherwise the in-memory demo adapter is used. Mirrors the
-    HTTP server's selection logic so both entrypoints behave identically.
+    Checks Neo4j first if configured and healthy; then TigerGraph;
+    otherwise falls back to DemoGraphRAGAdapter.
     """
+    neo4j_uri = os.environ.get("NEO4J_URI")
+    if neo4j_uri:
+        try:
+            adapter = Neo4jGraphRAGAdapter()
+            if adapter.health_check().get("status") == "ok":
+                return adapter
+        except Exception as exc:  # noqa: BLE001
+            print(f"[mcp_server] Neo4j unavailable ({exc}); trying TigerGraph", file=sys.stderr)
+
     try:
         adapter = TigerGraphAdapter()
         if adapter.health_check().get("status") == "ok":
             return adapter
-    except Exception as exc:  # noqa: BLE001 - degrade, never crash the server
-        print(f"[mcp_server] TigerGraph adapter unavailable ({exc}); using demo adapter", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[mcp_server] TigerGraph unavailable ({exc}); using demo adapter", file=sys.stderr)
         return DemoGraphRAGAdapter()
-    print("[mcp_server] TigerGraph unhealthy; using demo adapter", file=sys.stderr)
+
     return DemoGraphRAGAdapter()
 
 
 class GraphRAGState:
-    """Lazily-initialized shared contracts over one shared adapter."""
+    """Lazily-initialized shared contracts over the active adapter."""
 
     def __init__(self) -> None:
         self._adapter: Any | None = None
@@ -82,8 +100,18 @@ class GraphRAGState:
         self._federation: FederationContract | None = None
         self._evaluation: EvaluationContract | None = None
         self._authorization: AuthorizationContract | None = None
+        self._similarity: SimilarityContract | None = None
+        self._temporal: TemporalContract | None = None
+        self._explanation: ExplanationContract | None = None
+        self._diff: DiffContract | None = None
+        self._aggregate: AggregateContract | None = None
+        self._export: ExportContract | None = None
+        self._watch: WatchContract | None = None
         self._markdown = MarkdownFormatter()
         self._structured = StructuredFormatter()
+        self._storage = PersistentStorage.get_instance()
+        self._cache = QueryCache.get_instance()
+        self._limiter = RateLimiter.get_instance()
 
     @property
     def adapter(self) -> Any:
@@ -133,73 +161,186 @@ class GraphRAGState:
             self._authorization = AuthorizationContract()
         return self._authorization
 
+    @property
+    def similarity(self) -> SimilarityContract:
+        if self._similarity is None:
+            self._similarity = SimilarityContract(self.adapter)
+        return self._similarity
+
+    @property
+    def temporal(self) -> TemporalContract:
+        if self._temporal is None:
+            self._temporal = TemporalContract(self.adapter)
+        return self._temporal
+
+    @property
+    def explanation(self) -> ExplanationContract:
+        if self._explanation is None:
+            self._explanation = ExplanationContract(self.adapter)
+        return self._explanation
+
+    @property
+    def diff(self) -> DiffContract:
+        if self._diff is None:
+            self._diff = DiffContract(self.adapter)
+        return self._diff
+
+    @property
+    def aggregate(self) -> AggregateContract:
+        if self._aggregate is None:
+            self._aggregate = AggregateContract(self.adapter)
+        return self._aggregate
+
+    @property
+    def export(self) -> ExportContract:
+        if self._export is None:
+            self._export = ExportContract(self.adapter)
+        return self._export
+
+    @property
+    def watch(self) -> WatchContract:
+        if self._watch is None:
+            self._watch = WatchContract(self._storage)
+        return self._watch
+
 
 STATE = GraphRAGState()
 
 
-def _context_payload(ctx: SubgraphContext, *, format_text: str, max_tokens: int) -> dict[str, Any]:
-    """Structured protocol envelope + optional formatted text (Contract 8)."""
-    payload: dict[str, Any] = {
-        "protocol": ctx.protocol,
-        "operation": ctx.operation,
-        "query": ctx.query,
-        "results": ctx.results,
-        "provenance": ctx.provenance.model_dump(),
-        "metrics": ctx.metrics.model_dump(),
-    }
-    fmt = (format_text or "none").lower()
-    if fmt in ("markdown", "md"):
-        payload["formatted"] = STATE._markdown.format_context(ctx, max_tokens=max_tokens)
-    elif fmt in ("structured", "json"):
-        payload["formatted"] = STATE._structured.format_context(ctx, max_tokens=max_tokens)
-    return payload
+def _format(ctx: SubgraphContext, format_text: str, max_tokens: int) -> str | None:
+    mode = (format_text or "none").lower()
+    if mode == "markdown":
+        return STATE._markdown.format_context(ctx, max_tokens=max_tokens)
+    if mode in ("structured", "json"):
+        return STATE._structured.format_context(ctx, max_tokens=max_tokens)
+    return None
+
+
+def _context_payload(
+    ctx: SubgraphContext,
+    format_text: str = "none",
+    max_tokens: int = _DEFAULT_MAX_TOKENS,
+) -> dict[str, Any]:
+    dump = ctx.model_dump(mode="json")
+    formatted = _format(ctx, format_text=format_text, max_tokens=max_tokens)
+    if formatted is not None:
+        dump["formatted"] = formatted
+    return dump
 
 
 def _json(obj: Any) -> str:
-    return json.dumps(obj, indent=2, sort_keys=False)
+    return json.dumps(obj, indent=2, default=str)
 
 
 def build_server() -> MCPServer:
-    """Construct the MCP server with all 42 tools registered."""
+    """Construct the MCP server with all 47 tools, resources, and prompts registered."""
     mcp = MCPServer(
         name="grip",
-        version="0.2.0",
+        version="0.3.0",
         instructions=(
             "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
             "Use graphrag_search for natural-language queries (auto-routes to "
             "local/global/hybrid/entity), graphrag_schema to plan against the "
-            "backend's structure, and graphrag_provenance for citation audits."
+            "backend's structure, graphrag_provenance for citation audits, and "
+            "graphrag_batch for parallel execution."
         ),
     )
 
     # ------------------------------------------------------------------
-    # Retrieval tools (7)
+    # MCP Resources
+    # ------------------------------------------------------------------
+
+    @mcp.resource("graphrag://schema")
+    def resource_schema() -> str:
+        """Browseable full schema of the active knowledge graph."""
+        return _json(STATE.schema.get_schema().model_dump(mode="json"))
+
+    @mcp.resource("graphrag://entity/{entity_id}")
+    def resource_entity(entity_id: str) -> str:
+        """Browseable single entity context by ID."""
+        ctx = STATE.retrieval.entity_lookup(entity_id=entity_id, depth=1)
+        return _json(_context_payload(ctx))
+
+    @mcp.resource("graphrag://community/{community_id}")
+    def resource_community(community_id: str) -> str:
+        """Browseable community members and summary."""
+        ctx = STATE.retrieval.community_members(community_id=community_id)
+        return _json(_context_payload(ctx))
+
+    # ------------------------------------------------------------------
+    # MCP Prompts
+    # ------------------------------------------------------------------
+
+    @mcp.prompt("entity_analysis")
+    def prompt_entity_analysis(entity_name: str) -> str:
+        """Prompt template for deep analysis of a graph entity."""
+        return (
+            f"Please conduct a comprehensive analysis of the entity '{entity_name}'.\n"
+            f"1. Query the knowledge graph using graphrag_entity or graphrag_neighborhood.\n"
+            f"2. Inspect citations and source documents using graphrag_provenance.\n"
+            f"3. Explain why related entities were linked using graphrag_explain.\n"
+            f"4. Synthesize your findings citing supporting chunks."
+        )
+
+    @mcp.prompt("path_reasoning")
+    def prompt_path_reasoning(source: str, target: str) -> str:
+        """Prompt template to analyze the relationship chain between two entities."""
+        return (
+            f"Trace and explain the connection between '{source}' and '{target}'.\n"
+            f"1. Call graphrag_path to discover paths between the nodes.\n"
+            f"2. Call graphrag_explain_path to get a narrative reasoning breakdown.\n"
+            f"3. Provide a clear explanation of how they influence or relate to each other."
+        )
+
+    @mcp.prompt("community_summary")
+    def prompt_community_summary(community_id: str) -> str:
+        """Prompt template to summarize a high-level graph cluster."""
+        return (
+            f"Examine the community cluster '{community_id}' using graphrag_community.\n"
+            f"Describe the central theme, member entities, and overall significance."
+        )
+
+    # ------------------------------------------------------------------
+    # Internal Tool Invoker (for batch execution)
+    # ------------------------------------------------------------------
+
+    def _call_tool_internal(name: str, args: dict[str, Any]) -> Any:
+        return asyncio.run(mcp.call_tool(name, args))
+
+    # ------------------------------------------------------------------
+    # Contract 1 — Retrieval Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_search",
-        title="GraphRAG unified search",
-        description=(
-            "Auto-routing retrieval over any GraphRAG backend. Mode 'auto' "
-            "classifies the query (global overview / entity / hybrid). "
-            "Returns the protocol SubgraphContext envelope."
-        ),
+        title="Natural-language GraphRAG search",
+        description="Search the graph with automatic routing (local/global/hybrid/entity).",
     )
     def graphrag_search(
         query: str,
         mode: str = "auto",
-        top_k: int = 10,
         depth: int = 2,
+        top_k: int = 10,
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
+        explain: bool = False,
     ) -> str:
-        result = STATE.retrieval.search(query=query, mode=mode, top_k=top_k, depth=depth)
-        return _json(_context_payload(result.context, format_text=format_text, max_tokens=max_tokens))
+        cache_key = QueryCache.make_key("search", {"q": query, "m": mode, "d": depth, "k": top_k, "exp": explain})
+        cached = STATE._cache.get(cache_key)
+        if cached:
+            return _json(cached)
+
+        res = STATE.retrieval.search(query=query, mode=mode, depth=depth, top_k=top_k)
+        payload = _context_payload(res.context, format_text=format_text, max_tokens=max_tokens)
+        if explain:
+            payload["why_retrieved"] = STATE.explanation.explain(res.context, max_entities=top_k)
+        STATE._cache.set(cache_key, "search", payload)
+        return _json(payload)
 
     @mcp.tool(
         name="graphrag_local_search",
-        title="Local search",
-        description="Keyword/entity-anchored local retrieval around matched entities.",
+        title="Entity-centric local subgraph search",
+        description="Traverse outward from matched entities within depth hops.",
     )
     def graphrag_local_search(
         query: str,
@@ -214,37 +355,42 @@ def build_server() -> MCPServer:
 
     @mcp.tool(
         name="graphrag_global_search",
-        title="Global search",
-        description="Corpus-level summarization from community summaries at a given level.",
+        title="Global community-summary search",
+        description="Broad macro-level synthesis over precomputed community summaries.",
     )
     def graphrag_global_search(
         query: str,
         community_level: int = 2,
+        top_communities: int = 10,
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = STATE.retrieval.global_search(query=query, community_level=community_level)
+        ctx = STATE.retrieval.global_search(query=query, community_level=community_level, top_communities=top_communities)
         return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
 
     @mcp.tool(
         name="graphrag_hybrid_search",
-        title="Hybrid search",
-        description="Semantic + keyword + graph-structure fused retrieval.",
+        title="Hybrid vector + graph search",
+        description="Score fusion between vector similarity and graph topology.",
     )
     def graphrag_hybrid_search(
         query: str,
-        top_k: int = 10,
+        vector_weight: float = 0.5,
+        graph_weight: float = 0.5,
         depth: int = 2,
+        top_k: int = 10,
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = STATE.retrieval.hybrid_search(query=query, top_k=top_k, depth=depth)
+        ctx = STATE.retrieval.hybrid_search(
+            query=query, vector_weight=vector_weight, graph_weight=graph_weight, depth=depth, top_k=top_k
+        )
         return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
 
     @mcp.tool(
         name="graphrag_entity",
         title="Entity lookup",
-        description="Look up an entity by id and/or name; optionally expand its neighborhood.",
+        description="Fetch a specific entity by id/name plus its immediate context.",
     )
     def graphrag_entity(
         entity_id: str | None = None,
@@ -262,12 +408,13 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_path",
         title="Path search",
-        description="Find paths (up to max_hops) between two entities in the graph.",
+        description="Find connections between two entities using BFS, Dijkstra, or Yen's algorithm.",
     )
     def graphrag_path(
         source: str,
         target: str,
         max_hops: int = 4,
+        algorithm: str = "bfs",
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
@@ -276,8 +423,8 @@ def build_server() -> MCPServer:
 
     @mcp.tool(
         name="graphrag_neighborhood",
-        title="Neighborhood expansion",
-        description="Expand the graph neighborhood around an entity to a given depth.",
+        title="Entity neighborhood expansion",
+        description="Expand outward from an entity within depth hops.",
     )
     def graphrag_neighborhood(
         entity_id: str,
@@ -292,7 +439,7 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_community",
         title="Community members",
-        description="List member entities of a community, optionally with its summary.",
+        description="List members of a community cluster.",
     )
     def graphrag_community(
         community_id: str,
@@ -303,68 +450,69 @@ def build_server() -> MCPServer:
         ctx = STATE.retrieval.community_members(community_id=community_id, include_summary=include_summary)
         return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
 
+    # ------------------------------------------------------------------
+    # Contract 3 — Schema Discovery Tools
+    # ------------------------------------------------------------------
+
     @mcp.tool(
         name="graphrag_schema",
-        title="Schema discovery",
-        description="Introspect the backend's vertex/edge types, statistics, and sample entities.",
+        title="Graph schema",
+        description="Return full graph schema: vertex types, edge types, statistics.",
     )
     def graphrag_schema(graph_id: str | None = None) -> str:
-        return _json(STATE.schema.get_schema(graph_id=graph_id).model_dump())
+        return _json(STATE.schema.get_schema(graph_id=graph_id).model_dump(mode="json"))
 
     @mcp.tool(
         name="graphrag_entity_types",
         title="Entity types",
-        description="List the backend's vertex types with counts and sample attributes.",
+        description="List all vertex types with attributes and counts.",
     )
     def graphrag_entity_types(graph_id: str | None = None) -> str:
-        return _json([t.model_dump() for t in STATE.schema.get_entity_types(graph_id=graph_id)])
+        types = STATE.schema.get_entity_types(graph_id=graph_id)
+        return _json([t.model_dump(mode="json") for t in types])
 
     @mcp.tool(
         name="graphrag_relationship_types",
         title="Relationship types",
-        description="List the backend's edge types with endpoints, counts, and attributes.",
+        description="List all edge types with source/target and counts.",
     )
     def graphrag_relationship_types(graph_id: str | None = None) -> str:
-        return _json([t.model_dump() for t in STATE.schema.get_relationship_types(graph_id=graph_id)])
+        types = STATE.schema.get_relationship_types(graph_id=graph_id)
+        return _json([t.model_dump(mode="json") for t in types])
 
     @mcp.tool(
         name="graphrag_sample",
         title="Sample entities",
-        description="Fetch sample entities of a vertex type (useful for grounding before querying).",
+        description="Sample entities of a given vertex type for schema context.",
     )
-    def graphrag_sample(
-        entity_type: str,
-        limit: int = 5,
-        format_text: str = "none",
-        max_tokens: int = _DEFAULT_MAX_TOKENS,
-    ) -> str:
-        ctx = STATE.schema.get_sample_entities(entity_type=entity_type, limit=limit)
-        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+    def graphrag_sample(entity_type: str, count: int = 5, graph_id: str | None = None) -> str:
+        return _json(STATE.schema.get_sample_entities(entity_type=entity_type, count=count, graph_id=graph_id))
 
     # ------------------------------------------------------------------
-    # Provenance + formatting tools
+    # Contract 5 — Provenance Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_provenance",
-        title="Provenance trace",
-        description="Trace the full citation/audit chain for an entity or fact id.",
+        title="Citation trace",
+        description="Full citation chain and provenance for a fact or entity.",
     )
     def graphrag_provenance(fact_id: str) -> str:
-        return _json(STATE.provenance.trace_citation(fact_id).model_dump())
+        return _json(STATE.provenance.trace_citation(fact_id).model_dump(mode="json"))
 
     @mcp.tool(
         name="graphrag_trajectory",
         title="Traversal trajectory",
-        description="Replay the traversal trajectory (steps, actions, edges) behind a result.",
+        description="Ordered traversal steps taken across the graph for a query.",
     )
     def graphrag_trajectory(query_id: str) -> str:
-        return _json(STATE.provenance.get_traversal_trajectory(query_id=query_id).model_dump())
+        steps = STATE.provenance.get_traversal_trajectory(query_id=query_id)
+        return _json([s.model_dump(mode="json") for s in steps])
 
     @mcp.tool(
         name="graphrag_sources",
         title="Source documents",
-        description="List the source documents an entity was extracted from.",
+        description="Deduplicated list of source documents supporting an entity.",
     )
     def graphrag_sources(entity_id: str) -> str:
         return _json(STATE.provenance.get_source_documents(entity_id=entity_id))
@@ -372,18 +520,20 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_audit",
         title="Provenance audit",
-        description="Score trajectory completeness: cited vs examined entities, with a recommendation.",
+        description="Audit completeness score for a SubgraphContext provenance trail.",
     )
-    def graphrag_audit(query_id: str) -> str:
-        return _json(STATE.provenance.audit_provenance_completeness(query_id=query_id).model_dump())
+    def graphrag_audit(context: dict[str, Any]) -> str:
+        prov = STATE.provenance._coerce_provenance(context.get("provenance"))
+        return _json(STATE.provenance.audit_provenance_completeness(prov))
+
+    # ------------------------------------------------------------------
+    # Contract 8 — Formatting Tool
+    # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_format",
-        title="Format context",
-        description=(
-            "Re-format a previously returned SubgraphContext (JSON envelope) "
-            "into token-bounded Markdown or structured text for an LLM prompt."
-        ),
+        title="Format subgraph context",
+        description="Format a SubgraphContext envelope into bounded, LLM-ready text.",
     )
     def graphrag_format(
         context: dict[str, Any],
@@ -392,259 +542,256 @@ def build_server() -> MCPServer:
     ) -> str:
         try:
             ctx = SubgraphContext(**context)
-        except ValueError as exc:
-            return _json({"error": f"Invalid context: {exc}"})
-        if format_text.lower() in ("structured", "json"):
-            return STATE._structured.format_context(ctx, max_tokens=max_tokens)
-        return STATE._markdown.format_context(ctx, max_tokens=max_tokens)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context structure: {exc}"})
+        formatted = _format(ctx, format_text=format_text, max_tokens=max_tokens)
+        return formatted or _json(ctx.model_dump(mode="json"))
 
     # ------------------------------------------------------------------
-    # Admin tools (3)
+    # Admin / Status Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_status",
-        title="Backend status",
-        description="Health, identity, and graph statistics of the active backend.",
+        title="Backend status & health",
+        description="Health check and high-level graph statistics.",
     )
     def graphrag_status() -> str:
         health = STATE.adapter.health_check()
         try:
-            stats = STATE.schema.get_statistics().model_dump()
-        except Exception as exc:  # noqa: BLE001 - stats are best-effort
+            stats = STATE.schema.get_statistics().model_dump(mode="json")
+        except Exception as exc:  # noqa: BLE001
             stats = {"error": str(exc)}
-        return _json({"backend": health, "statistics": stats})
+        return _json({
+            "backend": health,
+            "statistics": stats,
+            "cache": {"hits": STATE._cache.hits, "misses": STATE._cache.misses},
+        })
 
     @mcp.tool(
         name="graphrag_config",
-        title="Get configuration",
-        description="Show the effective (non-secret) configuration of this server.",
+        title="Server configuration",
+        description="Echo current protocol, backend, and extraction config.",
     )
     def graphrag_config() -> str:
-        return _json(
-            {
-                "protocol": "graphrag/1.0",
-                "backend_requested": "tigergraph" if os.environ.get("TIGERGRAPH_HOST") else "demo",
-                "llm_model": os.environ.get("LLM_MODEL", "gemini-3.8-flash"),
-                "max_tokens_default": _DEFAULT_MAX_TOKENS,
-            }
-        )
+        return _json({
+            "protocol": "graphrag/1.0",
+            "server_version": "0.2.0",
+            "backend_adapter": type(STATE.adapter).__name__,
+            "default_max_tokens": _DEFAULT_MAX_TOKENS,
+            "extraction_strategy": _DEFAULT_EXTRACTION_STRATEGY,
+        })
 
     @mcp.tool(
         name="graphrag_list_backends",
-        title="List backends",
-        description="List backends this protocol build can talk to, and which is active.",
+        title="List federated backends",
+        description="List registered backends available for federated queries.",
     )
     def graphrag_list_backends() -> str:
-        active = STATE.adapter.health_check().get("backend", "unknown")
-        return _json(
-            {
-                "available": ["tigergraph", "demo"],
-                "active": active,
-                "note": "Add more adapters by implementing BaseGraphRAGAdapter.",
-            }
-        )
+        return _json([b.model_dump(mode="json") for b in STATE.federation.list_backends()])
 
     # ------------------------------------------------------------------
-    # Construction (Contract 4) — admin gated
+    # Contract 4 — Construction Tools (admin protected)
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_ingest",
-        title="Ingest documents",
-        description=(
-            "Real document -> knowledge-graph ingestion (Contract 4). Requires "
-            "the admin token; counters in the report are measured from the backend."
-        ),
+        title="Ingest documents into knowledge graph",
+        description="Ingest documents into graph (requires admin token or editor role).",
     )
     def graphrag_ingest(
         documents: list[dict[str, Any]],
-        dry_run: bool = False,
-        extraction: str = "frequency",
-        max_concepts_per_doc: int = 5,
+        extraction_strategy: str = _DEFAULT_EXTRACTION_STRATEGY,
         admin_token: str | None = None,
+        async_mode: bool = False,
     ) -> str:
         decision = STATE.authorization.check_permission("ingest", token=admin_token)
         if not decision.allowed:
             return _json({"error": "permission denied", **decision.model_dump()})
-        config = IngestionConfig(
-            graph_id=getattr(STATE.adapter, "_graphname", "default"),
-            extraction=extraction,
-            max_concepts_per_doc=max_concepts_per_doc,
-            dry_run=dry_run,
-        )
-        try:
-            report = STATE.construction.ingest(documents, config)
-        except RuntimeError as exc:
-            return _json({"error": str(exc)})
-        return _json(report.model_dump())
+
+        if async_mode:
+            job_id = f"job-{uuid.uuid4().hex[:8]}"
+            STATE._storage.save_job(job_id=job_id, status="running", graph_id="default", document_count=len(documents))
+
+            def _bg_run():
+                try:
+                    cfg = IngestionConfig(extraction_strategy=extraction_strategy)
+                    rep = STATE.construction.ingest(documents, config=cfg)
+                    STATE._storage.save_job(
+                        job_id=job_id, status="completed", graph_id="default",
+                        document_count=len(documents), report=rep.model_dump(mode="json")
+                    )
+                    STATE._cache.invalidate()
+                except Exception as ex:  # noqa: BLE001
+                    STATE._storage.save_job(job_id=job_id, status="failed", graph_id="default", error=str(ex))
+
+            asyncio.get_event_loop().run_in_executor(None, _bg_run)
+            return _json({"job_id": job_id, "status": "running", "message": "Ingestion job launched in background"})
+
+        cfg = IngestionConfig(extraction_strategy=extraction_strategy)
+        report = STATE.construction.ingest(documents, config=cfg)
+        STATE._cache.invalidate()
+        return _json(report.model_dump(mode="json"))
 
     @mcp.tool(
         name="graphrag_delete_document",
-        title="Delete document",
-        description="Delete a Paper vertex and its edges from the graph (Contract 4, admin only).",
+        title="Delete document vertex",
+        description="Delete a document vertex and cascade references (requires admin token).",
     )
     def graphrag_delete_document(document_id: str, admin_token: str | None = None) -> str:
         decision = STATE.authorization.check_permission("delete_document", token=admin_token)
         if not decision.allowed:
             return _json({"error": "permission denied", **decision.model_dump()})
-        return _json(STATE.construction.delete_document(document_id).model_dump())
+        report = STATE.construction.delete_document(document_id)
+        STATE._cache.invalidate()
+        return _json(report.model_dump(mode="json"))
 
     # ------------------------------------------------------------------
-    # Federation (Contract 6)
+    # Contract 6 — Federation Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_federated_search",
-        title="Federated search",
-        description=(
-            "Fan a query out to multiple graphs in the workspace and merge the "
-            "results with reciprocal rank fusion or weighted score (Contract 6)."
-        ),
+        title="Federated search across graphs",
+        description="Query multiple graph backends and merge results with RRF.",
     )
     def graphrag_federated_search(
         query: str,
-        mode: str = "auto",
-        top_k: int = 10,
+        backends: list[str] | None = None,
         merge_strategy: str = "rrf",
-        extra_graphs: list[str] | None = None,
+        top_k: int = 10,
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        graph = getattr(STATE.adapter, "_graphname", None)
-        backends = [BackendRef(name="primary", graph_id=graph)] if graph else []
-        for name in extra_graphs or []:
-            backends.append(BackendRef(name=name, graph_id=name))
-        config = FederationConfig(
-            backends=backends, merge_strategy=MergeStrategy(merge_strategy), top_k=top_k
+        allowed = [b.name for b in STATE.federation.list_backends()]
+        chosen = backends or allowed or ["primary"]
+        backend_refs = [
+            BackendRef(name=b, graph_id=getattr(STATE.adapter, "_graphname", b))
+            for b in chosen
+        ]
+        cfg = FederationConfig(
+            backends=backend_refs,
+            merge_strategy=MergeStrategy(merge_strategy),
+            top_k=top_k,
         )
-        ctx = STATE.federation.federated_search(query, config=config, mode=mode)
+        ctx = STATE.federation.federated_search(query=query, config=cfg)
         return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
 
     @mcp.tool(
         name="graphrag_entity_link",
         title="Cross-graph entity link",
-        description="Find the same entity across federated graphs (Contract 6).",
+        description="Find entity references across federated backends.",
     )
-    def graphrag_entity_link(entity_name: str, entity_type: str | None = None) -> str:
-        graph = getattr(STATE.adapter, "_graphname", None)
-        config = FederationConfig(backends=[BackendRef(name="primary", graph_id=graph)] if graph else [])
-        links = STATE.federation.cross_graph_entity_link(entity_name, config=config, entity_type=entity_type)
-        return _json([link.model_dump() for link in links])
+    def graphrag_entity_link(entity_name: str, backends: list[str] | None = None) -> str:
+        allowed = [b.name for b in STATE.federation.list_backends()]
+        refs = [BackendRef(name=b, graph_id=b) for b in (backends or allowed)]
+        links = STATE.federation.cross_graph_entity_link(entity_name=entity_name, backends=refs)
+        return _json([link.model_dump(mode="json") for link in links])
 
     # ------------------------------------------------------------------
-    # Streaming (Contract 7)
+    # Contract 7 — Streaming Tool
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_events",
-        title="Recent graph events",
-        description=(
-            "Recent graph-mutation events from the streaming bus (Contract 7). "
-            "Ingestion publishes real events here; the HTTP server exposes a live "
-            "SSE feed at /stream/events."
-        ),
+        title="Recent graph mutation events",
+        description="Read recent events from the streaming event bus.",
     )
-    def graphrag_events(limit: int = 20, event_type: str | None = None) -> str:
-        events = STREAM_BUS.recent(max(1, min(limit, 200)))
-        if event_type:
-            events = [e for e in events if e.event_type.value == event_type]
-        return _json(
-            {
-                "subscribers": STREAM_BUS.subscriber_count,
-                "events": [e.model_dump(mode="json") for e in events],
-                "known_types": [t.value for t in StreamEventType],
-            }
-        )
+    def graphrag_events(limit: int = 20) -> str:
+        events = STREAM_BUS.recent(limit)
+        return _json([e.model_dump(mode="json") for e in events])
 
     # ------------------------------------------------------------------
-    # Evaluation (Contract 9) + Authorization (Contract 10)
+    # Contract 9 — Evaluation Tool
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_evaluate",
-        title="Evaluate pipelines",
-        description=(
-            "Run real retrieval/answer evaluation over the benchmark query set "
-            "(Contract 9): precision@k, recall@k, LLM-as-judge and grounding."
-        ),
+        title="Evaluate retrieval and answer quality",
+        description="Compute standard precision@k, recall@k, BERTScore, and LLM-as-judge scores.",
     )
-    def graphrag_evaluate(limit: int = 5, mode: str = "auto", pipeline: str = "graphrag", references_path: str | None = None) -> str:
-        from mcp_server.pipelines import load_query_set
-
-        references: dict[str, str] = {}
-        if references_path:
-            try:
-                with open(references_path) as handle:
-                    references = json.load(handle)
-            except FileNotFoundError:
-                pass
-            except Exception as exc:  # noqa: BLE001 - references are optional
-                print(f"[mcp_server] references unavailable ({type(exc).__name__})", file=sys.stderr)
+    def graphrag_evaluate(
+        query: str,
+        answer: str,
+        context: dict[str, Any],
+        references_path: str | None = None,
+        query_id: str | None = None,
+        judge: bool = False,
+        bert_score: bool = False,
+    ) -> str:
         try:
-            query_set = [
-                {**item, "reference": references.get(item["id"], "")}
-                for item in load_query_set(limit=max(1, min(limit, 25)))
-            ]
-        except (OSError, ValueError) as exc:
-            # Never invent queries: report the real problem instead.
-            return _json({"error": f"benchmark query set unavailable: {exc}"})
-        report = STATE.evaluation.evaluate_report(query_set, mode=mode, pipeline=pipeline)
-        return _json(report.model_dump())
+            ctx = SubgraphContext(**context)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context: {exc}"})
+
+        ref_file = references_path or os.environ.get("GRAPHRAG_REFERENCES_PATH")
+        references: dict[str, Any] = {}
+        if ref_file and os.path.isfile(ref_file):
+            try:
+                with open(ref_file, encoding="utf-8") as f:
+                    references = json.load(f)
+            except Exception:  # noqa: BLE001
+                references = {}
+
+        report = STATE.evaluation.evaluate_report(
+            query=query, answer=answer, context=ctx, references=references,
+            query_id=query_id, judge=judge, bert_score=bert_score
+        )
+        return _json(report.model_dump(mode="json"))
+
+    # ------------------------------------------------------------------
+    # Contract 10 — Authorization Tool
+    # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_authorize",
-        title="Check permission",
-        description="Check whether an operation is permitted for a role/token (Contract 10).",
+        title="Permission check",
+        description="Check whether an operation is permitted for a bearer or capability token.",
     )
-    def graphrag_authorize(operation: str, admin_token: str | None = None) -> str:
-        result = STATE.authorization.check_permission(operation, token=admin_token)
-        return _json(
-            {
-                **result.model_dump(),
-                "allowed_operations": STATE.authorization.get_allowed_operations(token=admin_token),
-            }
-        )
+    def graphrag_authorize(
+        operation: str,
+        token: str | None = None,
+        graph_id: str | None = None,
+    ) -> str:
+        res = STATE.authorization.check_permission(operation=operation, graph_id=graph_id, token=token)
+        return _json(res.model_dump(mode="json"))
 
     # ------------------------------------------------------------------
-    # Contract 11 — Semantic Similarity
+    # Contract 11 — Semantic Similarity Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_similarity",
         title="Semantic similarity",
-        description="Compute cosine (vector) or Jaccard (lexical) similarity between two text blobs or entity IDs.",
+        description="Compute cosine (vector) or Jaccard similarity between two text blobs.",
     )
     def graphrag_similarity(text_a: str, text_b: str) -> str:
-        from mcp_server.contracts.similarity import SimilarityContract
-        return _json(SimilarityContract(STATE.adapter).similarity(text_a, text_b))
+        return _json(STATE.similarity.similarity(text_a, text_b))
 
     @mcp.tool(
         name="graphrag_entity_similarity",
         title="Entity semantic similarity",
-        description="Compare two entities by id using their names and properties text.",
+        description="Compare two entities by ID using their names and properties text.",
     )
     def graphrag_entity_similarity(entity_id_a: str, entity_id_b: str) -> str:
-        from mcp_server.contracts.similarity import SimilarityContract
-        return _json(SimilarityContract(STATE.adapter).entity_similarity(entity_id_a, entity_id_b))
+        return _json(STATE.similarity.entity_similarity(entity_id_a, entity_id_b))
 
     @mcp.tool(
         name="graphrag_batch_similarity",
         title="Batch similarity ranking",
-        description="Rank a list of candidate texts by similarity to an anchor text, highest first.",
+        description="Rank candidate texts by similarity to an anchor text, highest first.",
     )
     def graphrag_batch_similarity(anchor: str, candidates: list[str]) -> str:
-        from mcp_server.contracts.similarity import SimilarityContract
-        return _json(SimilarityContract(STATE.adapter).batch_similarity(anchor, candidates))
+        return _json(STATE.similarity.batch_similarity(anchor, candidates))
 
     # ------------------------------------------------------------------
-    # Contract 12 — Temporal Query
+    # Contract 12 — Temporal Query Tool
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_temporal_search",
         title="Temporal search",
-        description="Retrieve entities filtered by a date range (start/end ISO-8601). Filters on published, created_at, updated_at attributes.",
+        description="Retrieve entities filtered by date range (start/end ISO-8601).",
     )
     def graphrag_temporal_search(
         query: str,
@@ -656,31 +803,26 @@ def build_server() -> MCPServer:
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        from mcp_server.contracts.temporal import TemporalContract
-        ctx = TemporalContract(STATE.adapter).temporal_search(
+        ctx = STATE.temporal.temporal_search(
             query=query, start=start, end=end, mode=mode, top_k=top_k, depth=depth
         )
         return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
 
     # ------------------------------------------------------------------
-    # Contract 13 — Explanation
+    # Contract 13 — Explanation Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_explain",
         title="Explain retrieval",
-        description="Generate natural-language explanations for why each entity was retrieved in a SubgraphContext.",
+        description="Generate natural-language explanations for why each entity was retrieved.",
     )
-    def graphrag_explain(
-        context: dict[str, Any],
-        max_entities: int = 10,
-    ) -> str:
-        from mcp_server.contracts.explanation import ExplanationContract
+    def graphrag_explain(context: dict[str, Any], max_entities: int = 10) -> str:
         try:
             ctx = SubgraphContext(**context)
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(ExplanationContract(STATE.adapter).explain(ctx, max_entities=max_entities))
+        return _json(STATE.explanation.explain(ctx, max_entities=max_entities))
 
     @mcp.tool(
         name="graphrag_explain_path",
@@ -688,21 +830,20 @@ def build_server() -> MCPServer:
         description="Explain the reasoning behind each path found in a path_search SubgraphContext.",
     )
     def graphrag_explain_path(context: dict[str, Any]) -> str:
-        from mcp_server.contracts.explanation import ExplanationContract
         try:
             ctx = SubgraphContext(**context)
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(ExplanationContract(STATE.adapter).explain_path(ctx))
+        return _json(STATE.explanation.explain_path(ctx))
 
     # ------------------------------------------------------------------
-    # Contract 14 — Diff
+    # Contract 14 — Diff Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_diff",
         title="Context diff",
-        description="Compare two SubgraphContext envelopes and return the structural delta (entities added/removed, relationships changed).",
+        description="Structural delta between two SubgraphContext envelopes.",
     )
     def graphrag_diff(
         context_a: dict[str, Any],
@@ -710,13 +851,12 @@ def build_server() -> MCPServer:
         label_a: str = "a",
         label_b: str = "b",
     ) -> str:
-        from mcp_server.contracts.diff import DiffContract
         try:
             ctx_a = SubgraphContext(**context_a)
             ctx_b = SubgraphContext(**context_b)
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(DiffContract(STATE.adapter).diff_contexts(ctx_a, ctx_b, label_a=label_a, label_b=label_b))
+        return _json(STATE.diff.diff_contexts(ctx_a, ctx_b, label_a=label_a, label_b=label_b))
 
     @mcp.tool(
         name="graphrag_diff_queries",
@@ -730,51 +870,35 @@ def build_server() -> MCPServer:
         top_k: int = 10,
         depth: int = 2,
     ) -> str:
-        from mcp_server.contracts.diff import DiffContract
-        return _json(DiffContract(STATE.adapter).diff_queries(query_a=query_a, query_b=query_b, mode=mode, top_k=top_k, depth=depth))
+        return _json(STATE.diff.diff_queries(query_a=query_a, query_b=query_b, mode=mode, top_k=top_k, depth=depth))
 
     # ------------------------------------------------------------------
-    # Contract 15 — Aggregate
+    # Contract 15 — Aggregate Tools
     # ------------------------------------------------------------------
 
     @mcp.tool(
         name="graphrag_count",
         title="Count entities",
-        description="Count entities of a given type, optionally with attribute filters. Uses schema stats (real backend counts).",
+        description="Count entities of a given type, optionally with attribute filters.",
     )
-    def graphrag_count(
-        entity_type: str | None = None,
-        filters: dict[str, Any] | None = None,
-    ) -> str:
-        from mcp_server.contracts.aggregate import AggregateContract
-        return _json(AggregateContract(STATE.adapter).count(entity_type=entity_type, filters=filters))
+    def graphrag_count(entity_type: str | None = None, filters: dict[str, Any] | None = None) -> str:
+        return _json(STATE.aggregate.count(entity_type=entity_type, filters=filters))
 
     @mcp.tool(
         name="graphrag_group_by",
         title="Group entities by attribute",
         description="Group entities of a type by an attribute and return counts per group.",
     )
-    def graphrag_group_by(
-        entity_type: str,
-        attribute: str,
-        top_n: int = 20,
-    ) -> str:
-        from mcp_server.contracts.aggregate import AggregateContract
-        return _json(AggregateContract(STATE.adapter).group_by(entity_type=entity_type, attribute=attribute, top_n=top_n))
+    def graphrag_group_by(entity_type: str, attribute: str, top_n: int = 20) -> str:
+        return _json(STATE.aggregate.group_by(entity_type=entity_type, attribute=attribute, top_n=top_n))
 
     @mcp.tool(
         name="graphrag_top_n",
         title="Top-N entities by attribute",
         description="Return top-N entities of a type ranked by a numeric attribute value.",
     )
-    def graphrag_top_n(
-        entity_type: str,
-        rank_by: str,
-        n: int = 10,
-        descending: bool = True,
-    ) -> str:
-        from mcp_server.contracts.aggregate import AggregateContract
-        return _json(AggregateContract(STATE.adapter).top_n(entity_type=entity_type, rank_by=rank_by, n=n, descending=descending))
+    def graphrag_top_n(entity_type: str, rank_by: str, n: int = 10, descending: bool = True) -> str:
+        return _json(STATE.aggregate.top_n(entity_type=entity_type, rank_by=rank_by, n=n, descending=descending))
 
     @mcp.tool(
         name="graphrag_stats_summary",
@@ -782,33 +906,26 @@ def build_server() -> MCPServer:
         description="Comprehensive statistics: vertex/edge counts by type, density, connected components.",
     )
     def graphrag_stats_summary() -> str:
-        from mcp_server.contracts.aggregate import AggregateContract
-        return _json(AggregateContract(STATE.adapter).stats_summary())
+        return _json(STATE.aggregate.stats_summary())
 
     @mcp.tool(
         name="graphrag_job_status",
         title="Ingestion job status",
-        description="Check the status of a background ingestion job started with async_mode=True.",
+        description="Check the status of a background ingestion job (persisted in SQLite).",
     )
     def graphrag_job_status(job_id: str) -> str:
-        # Job registry is stored in STATE; jobs are dict entries added by async ingest
-        jobs = getattr(STATE, "_jobs", {})
-        if job_id in jobs:
-            return _json(jobs[job_id])
+        job = STATE._storage.get_job(job_id)
+        if job:
+            return _json(job)
         return _json({"job_id": job_id, "status": "not_found", "error": "Unknown job id"})
 
     @mcp.tool(
         name="graphrag_register_backend",
         title="Register federated backend",
-        description="Register a named backend adapter for federated queries (Contract 6). Returns the BackendRef.",
+        description="Register a named backend adapter for federated queries (requires admin token).",
     )
-    def graphrag_register_backend(
-        name: str,
-        graph_id: str,
-        weight: float = 1.0,
-        admin_token: str | None = None,
-    ) -> str:
-        decision = STATE.authorization.check_permission("ingest", token=admin_token)
+    def graphrag_register_backend(name: str, graph_id: str, weight: float = 1.0, admin_token: str | None = None) -> str:
+        decision = STATE.authorization.check_permission("register_backend", token=admin_token)
         if not decision.allowed:
             return _json({"error": "permission denied", **decision.model_dump()})
         ref = STATE.federation.register_backend(name=name, weight=weight)
@@ -817,22 +934,137 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_audit_log",
         title="Audit log",
-        description="Return recent write operations (ingest/delete) from the streaming event bus, filtered to mutation events.",
+        description="Return persistent timestamped write operations log from SQLite.",
     )
     def graphrag_audit_log(limit: int = 50) -> str:
-        mutation_types = {"entity_created", "entity_updated", "entity_deleted", "edge_created", "ingestion_completed"}
-        events = STREAM_BUS.recent(max(1, min(limit, 500)))
-        audit = [e.model_dump(mode="json") for e in events if e.event_type.value in mutation_types]
-        return _json({"total": len(audit), "events": audit})
+        events = STATE._storage.get_events(limit=limit)
+        return _json({"total": len(events), "events": events})
+
+    # ------------------------------------------------------------------
+    # Contract 16 — Subgraph Export
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_export_subgraph",
+        title="Export subgraph format",
+        description="Export a SubgraphContext into portable graphml, cypher, json_ld, or rdf_turtle.",
+    )
+    def graphrag_export_subgraph(context: dict[str, Any], format: str = "graphml") -> str:
+        try:
+            ctx = SubgraphContext(**context)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": f"Invalid context: {exc}"})
+        return _json(STATE.export.export(ctx, format=format))
+
+    # ------------------------------------------------------------------
+    # Contract 17 — Batch Execution
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_batch",
+        title="Execute batch of tools",
+        description="Execute an array of up to 25 tool operations concurrently in a single round-trip.",
+    )
+    def graphrag_batch(calls: list[dict[str, Any]]) -> str:
+        batcher = BatchContract(tool_executor=_call_tool_internal)
+        return _json(batcher.execute_batch(calls))
+
+    # ------------------------------------------------------------------
+    # Contract 18 — Watch & Push Notifications
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_watch",
+        title="Watch graph mutations",
+        description="Query and observe graph change events with filters and replay.",
+    )
+    def graphrag_watch(
+        graph_id: str | None = None,
+        event_types: list[str] | None = None,
+        entity_id: str | None = None,
+        since_timestamp: str | None = None,
+        limit: int = 50,
+    ) -> str:
+        return _json(STATE.watch.watch(
+            graph_id=graph_id, event_types=event_types,
+            entity_id=entity_id, since_timestamp=since_timestamp, limit=limit
+        ))
+
+    # ------------------------------------------------------------------
+    # Pagination Cursor
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_next_page",
+        title="Next page of large subgraph",
+        description="Fetch next page of entities and relationships using a cursor.",
+    )
+    def graphrag_next_page(cursor: str, page_size: int = 50) -> str:
+        entry = _CURSORS.get(cursor)
+        if not entry:
+            return _json({"error": f"Cursor {cursor!r} not found or expired"})
+        items = entry.get("items", [])
+        offset = entry.get("offset", 0)
+        sliced = items[offset:offset + page_size]
+        new_offset = offset + page_size
+        has_more = new_offset < len(items)
+        if has_more:
+            entry["offset"] = new_offset
+        else:
+            _CURSORS.pop(cursor, None)
+
+        return _json({
+            "items": sliced,
+            "page_size": len(sliced),
+            "next_cursor": cursor if has_more else None,
+            "has_more": has_more,
+        })
+
+    # ------------------------------------------------------------------
+    # Capability Tokens (5-tier RBAC)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        name="graphrag_capability_token",
+        title="Issue capability token",
+        description="Mint a signed HMAC capability token granting analyst/editor/admin privileges.",
+    )
+    def graphrag_capability_token(
+        role: str = "analyst",
+        operations: list[str] | None = None,
+        ttl_seconds: int = 3600,
+        admin_token: str | None = None,
+    ) -> str:
+        try:
+            token = STATE.authorization.issue_capability_token(
+                role=role, operations=operations, ttl_seconds=ttl_seconds, admin_token=admin_token
+            )
+            return _json({
+                "token": token,
+                "role": role,
+                "ttl_seconds": ttl_seconds,
+                "status": "active",
+            })
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc)})
 
     return mcp
 
 
 def main() -> None:
-    """Run the MCP server over stdio (the transport MCP clients expect)."""
+    """Run the MCP server over stdio or streamable-http."""
     load_dotenv()
+    parser = argparse.ArgumentParser(description="GraphRAG Interoperability Protocol (GRIP) MCP Server")
+    parser.add_argument("--transport", default="stdio", choices=["stdio", "streamable-http", "sse"], help="Transport mode")
+    parser.add_argument("--host", default="0.0.0.0", help="Bind host for HTTP/SSE")
+    parser.add_argument("--port", type=int, default=8000, help="Bind port for HTTP/SSE")
+    args = parser.parse_args()
+
     server = build_server()
-    server.run(transport="stdio")
+    if args.transport == "stdio":
+        server.run(transport="stdio")
+    elif args.transport in ("streamable-http", "sse"):
+        server.run(transport="streamable-http", host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

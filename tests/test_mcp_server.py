@@ -35,10 +35,10 @@ def _call(server, name: str, arguments: dict) -> dict:
     return json.loads(result.content[0].text)
 
 
-def test_registers_all_42_protocol_tools(server):
+def test_registers_all_47_protocol_tools(server):
     tools = asyncio.run(server.list_tools())
     names = {t.name for t in tools}
-    assert len(names) == 42
+    assert len(names) == 47
     # Original 27 tools
     original_27 = {
         "graphrag_search",
@@ -69,7 +69,7 @@ def test_registers_all_42_protocol_tools(server):
         "graphrag_evaluate",
         "graphrag_authorize",
     }
-    # New 15 tools (Contracts 11-15 + admin extensions)
+    # 15 tools (Contracts 11-15 + admin extensions)
     new_15 = {
         "graphrag_similarity",
         "graphrag_entity_similarity",
@@ -87,7 +87,15 @@ def test_registers_all_42_protocol_tools(server):
         "graphrag_register_backend",
         "graphrag_audit_log",
     }
-    expected = original_27 | new_15
+    # 5 tools (Contracts 16-18 + pagination & capability tokens)
+    new_5 = {
+        "graphrag_export_subgraph",
+        "graphrag_batch",
+        "graphrag_watch",
+        "graphrag_next_page",
+        "graphrag_capability_token",
+    }
+    expected = original_27 | new_15 | new_5
     assert names == expected
 
 
@@ -217,4 +225,67 @@ def test_new_admin_and_job_tools(server, monkeypatch):
 
     audit = _call(server, "graphrag_audit_log", {"limit": 10})
     assert "events" in audit
+
+
+def test_new_export_tool(server):
+    ctx = _call(server, "graphrag_search", {"query": "transformer", "mode": "local"})
+    exp_graphml = _call(server, "graphrag_export_subgraph", {"context": ctx, "format": "graphml"})
+    assert exp_graphml["format"] == "graphml"
+    assert "<graphml" in exp_graphml["content"]
+
+    exp_cypher = _call(server, "graphrag_export_subgraph", {"context": ctx, "format": "cypher"})
+    assert exp_cypher["format"] == "cypher"
+    assert "MERGE" in exp_cypher["content"]
+
+
+def test_new_batch_tool(server):
+    batch_res = _call(
+        server,
+        "graphrag_batch",
+        {
+            "calls": [
+                {"tool": "graphrag_count", "arguments": {"entity_type": "Paper"}},
+                {"tool": "graphrag_similarity", "arguments": {"text_a": "deep learning", "text_b": "neural network"}},
+            ]
+        },
+    )
+    assert batch_res["total"] == 2
+    assert batch_res["successful"] == 2
+
+
+def test_new_watch_tool(server):
+    watch_res = _call(server, "graphrag_watch", {"limit": 10})
+    assert "events" in watch_res
+    assert "subscriber_count" in watch_res
+
+
+def test_new_capability_token_tool(server, monkeypatch):
+    monkeypatch.setenv("GRAPHRAG_ADMIN_TOKEN", "admin_secret_token")
+    tok_res = _call(
+        server,
+        "graphrag_capability_token",
+        {"role": "analyst", "ttl_seconds": 1800, "admin_token": "admin_secret_token"},
+    )
+    assert "token" in tok_res
+    assert tok_res["token"].startswith("cap_")
+
+
+def test_new_pagination_cursor(server):
+    from mcp_server.mcp_server import _CURSORS
+
+    _CURSORS["cur_test"] = {"items": [{"id": f"p_{i}"} for i in range(120)], "offset": 0}
+    page1 = _call(server, "graphrag_next_page", {"cursor": "cur_test", "page_size": 50})
+    assert page1["page_size"] == 50
+    assert page1["has_more"] is True
+    assert page1["next_cursor"] == "cur_test"
+
+
+def test_mcp_resources_and_prompts(server):
+    resources = asyncio.run(server.list_resources())
+    assert any(r.uri == "graphrag://schema" for r in resources)
+
+    prompts = asyncio.run(server.list_prompts())
+    prompt_names = {p.name for p in prompts}
+    assert {"entity_analysis", "path_reasoning", "community_summary"} <= prompt_names
+
 

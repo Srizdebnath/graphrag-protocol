@@ -32,6 +32,7 @@ eval/reports/
 *.jsonl
 *.parquet
 *.pkl
+*.sqlite3*
 
 # IDE / OS
 .vscode/

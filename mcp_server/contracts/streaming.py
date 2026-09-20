@@ -79,6 +79,20 @@ class StreamBus:
             The number of subscribers the event was queued for.
         """
         self._history.append(event)
+        try:
+            from mcp_server.storage import PersistentStorage
+
+            PersistentStorage.get_instance().append_event(
+                event_id=event.event_id,
+                event_type=event.event_type.value if hasattr(event.event_type, "value") else str(event.event_type),
+                graph_id=event.graph_id,
+                timestamp=event.timestamp,
+                entity_id=event.entity_id,
+                entity_type=event.entity_type,
+                payload=event.payload,
+            )
+        except Exception:  # noqa: BLE001, S110 - storage persistence is non-blocking
+            pass
         with self._lock:
             count = len(self._subscribers)
         loop = self._loop
@@ -172,7 +186,7 @@ class StreamBus:
             return len(self._subscribers)
 
     def recent(self, limit: int = 20) -> list[StreamEvent]:
-        """Most recent events, newest last."""
+        """Most recent events on this bus, newest last."""
         if limit <= 0:
             return []
         return list(self._history)[-limit:]

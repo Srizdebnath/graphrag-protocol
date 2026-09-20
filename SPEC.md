@@ -1,6 +1,6 @@
 # GraphRAG Protocol — Specification
 
-**Version:** 1.1 · **Status:** Draft · **License:** MIT
+**Version:** 1.2 · **Status:** Stable Reference · **License:** MIT
 
 > **Universal GraphRAG Interoperability Protocol.** Standard contracts, a reference MCP server, and pluggable adapters so *any agent can query any GraphRAG backend uniformly*.
 
@@ -23,8 +23,8 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
           +--------->|  GraphRAG      |<-------+
                      |  Interoperability
                      |  Protocol (this)
-                     |  + 15 contracts
-                     |  + 42-tool MCP server
+                     |  + 18 contracts
+                     |  + 47-tool MCP server
                      |  + adapters
                      +----------------+
 </pre>
@@ -41,10 +41,13 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 4. **Vendor-neutral evaluation.** Because all backends emit the same `RetrievalMetrics`, backends can be benchmarked on identical queries with identical scoring.
 5. **Interpretability.** The explanation contract (Contract 13) tells agents *why* each entity was retrieved, turning a black box into an explainable retrieval system.
 6. **Temporal reasoning.** The temporal contract (Contract 12) lets agents filter any subgraph by date range — essential for news, financial, and medical graphs.
+7. **Interoperable Export.** The export contract (Contract 16) serializes subgraphs directly to GraphML, Cypher `MERGE`, JSON-LD, and RDF-Turtle.
+8. **High Throughput.** The batch runner (Contract 17) fans out tool execution concurrently up to 25 parallel queries in a single agent step.
+9. **Event-Driven Subscriptions.** The watch contract (Contract 18) bridges the streaming bus with persistent SQLite journal replay.
 
 ---
 
-## 2. The 15 Contracts
+## 2. The 18 Contracts
 
 | # | Contract | Purpose | JSON Schema | Status |
 |---|----------|---------|-------------|--------|
@@ -57,12 +60,15 @@ GraphRAG Protocol fills the missing middle layer between two existing standards:
 | 7 | **Streaming** `StreamEvent` | Real-time graph change notifications | `schemas/stream-event.json` | Summarized in §10.3 |
 | 8 | **Prompt Formatting** `PromptFormatConfig` | Context → LLM-ready text | `schemas/prompt-format-config.json` | Detailed in §7 |
 | 9 | **Evaluation** `EvaluationReport` | Standard retrieval/answer metrics | `schemas/evaluation-report.json` | Summarized in §10.4 |
-| 10 | **Authorization** `AccessPolicy` | Per-operation permission model | `schemas/access-policy.json` | Summarized in §10.5 |
+| 10 | **Authorization** `AccessPolicy` | 5-tier RBAC + HMAC capability tokens | `schemas/access-policy.json` | Summarized in §10.5 |
 | 11 | **Semantic Similarity** | Cosine + Jaccard similarity between entities or text | — | `contracts/similarity.py` |
 | 12 | **Temporal Query** | Date-range filtering over retrieved subgraphs | — | `contracts/temporal.py` |
 | 13 | **Explanation** | Natural-language "why retrieved" narrative per entity | — | `contracts/explanation.py` |
 | 14 | **Diff** | Structural delta between two SubgraphContexts | — | `contracts/diff.py` |
 | 15 | **Aggregate** | OLAP-style count, group-by, top-N, stats summary | — | `contracts/aggregate.py` |
+| 16 | **Subgraph Export** | GraphML, Cypher, JSON-LD, RDF Turtle serialization | — | `contracts/export.py` |
+| 17 | **Batch Execution** | Concurrent tool execution fan-out (up to 25 items) | — | `contracts/batch.py` |
+| 18 | **Watch & Subscriptions** | Filtered graph change querying & replay over SQLite | — | `contracts/watch.py` |
 
 
 
@@ -375,7 +381,7 @@ Abstract interfaces in `mcp_server/contracts/base.py` (`BaseRetrievalContract`),
 ## 9. Architecture
 
 ```
-Agents (LangGraph, CrewAI, custom)  │  MCP server (42 tools)  │  Protocol contracts  │  Adapters  │  Backends
+Agents (LangGraph, CrewAI, custom)  │  MCP server (47 tools)  │  Protocol contracts  │  Adapters  │  Backends
            │                        │        graphrag_search        │   retrieval        │  TigerGraph│
            │                        │        graphrag_entity         │   schema           │  Neo4j     │
            │      (MCP)             │        graphrag_path           │   provenance  ◄───►│  LightRAG  │
@@ -384,12 +390,15 @@ Agents (LangGraph, CrewAI, custom)  │  MCP server (42 tools)  │  Protocol co
                                              graphrag_explain          │   explanation                  │
                                              graphrag_diff             │   diff                         │
                                              graphrag_count            │   aggregate                    │
-                                             ... 42 tools ...         │                                │
+                                             graphrag_export_subgraph  │   export                       │
+                                             graphrag_batch            │   batch                        │
+                                             graphrag_watch            │   watch                        │
+                                             ... 47 tools ...         │                                │
 ```
 
 ---
 
-## 10. Contracts 4, 6, 7, 9, 10 (Summaries)
+## 10. Contracts 4, 6, 7, 9, 10, 16, 17, 18 (Summaries)
 
 ### 10.1 Contract 4 — Construction (`IngestionConfig`)
 
@@ -441,11 +450,43 @@ Includes token counts, latency, precision@k, BERTScore F1, and LLM-as-judge PASS
 
 ### 10.5 Contract 10 — Authorization (`AccessPolicy`)
 
-Per-operation permission model for exposure through MCP.
+5-tier role-based access control (`anonymous`, `analyst`, `editor`, `admin`, `super_admin`) with HMAC capability tokens.
 
 ```python
-check_permission(operation, graph_id, user_id, resource_filter) -> PermissionResult
-get_allowed_operations(user_id, graph_id) -> list[str]
+check_permission(operation, graph_id, user_id, resource_filter, token) -> PermissionResult
+get_allowed_operations(user_id, graph_id, role) -> list[str]
+issue_capability_token(subject, role, operations, ttl_seconds) -> str
+verify_capability_token(token) -> dict[str, Any]
+```
+
+### 10.6 Contract 16 — Subgraph Export (`ExportContract`)
+
+Serializes SubgraphContext instances to interoperable open formats for visualization and ingestion into external engines.
+
+```python
+export(context, format="graphml" | "cypher" | "jsonld" | "turtle") -> str
+```
+
+Supported formats:
+- `graphml`: Open XML standard for Gephi, NetworkX, Cytoscape.
+- `cypher`: Executable parameterized Cypher `MERGE` statements.
+- `jsonld`: Schema.org / W3C JSON-LD graph.
+- `turtle`: W3C RDF Turtle serialization.
+
+### 10.7 Contract 17 — Batch Runner (`BatchContract`)
+
+Executes up to 25 parallel tool queries in a single agent step to eliminate multiple round-trips.
+
+```python
+execute_batch(items, executor_fn, max_workers=5) -> list[BatchItemResult]
+```
+
+### 10.8 Contract 18 — Push Watch & Subscriptions (`WatchContract`)
+
+Persistent SQLite-backed stream event log allowing filtered queries, replays, and cursor-based event streaming.
+
+```python
+watch(event_types, entity_id, since_iso, limit=50) -> list[dict[str, Any]]
 ```
 
 ---

@@ -13,12 +13,16 @@ All tests are hermetic (no network, no TigerGraph, no LLM API keys required).
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import pytest
 
 from mcp_server.adapters.fallback_adapter import DemoGraphRAGAdapter
 from mcp_server.contracts.aggregate import AggregateContract
 from mcp_server.contracts.diff import DiffContract
 from mcp_server.contracts.explanation import ExplanationContract
+from mcp_server.contracts.export import ExportContract
 from mcp_server.contracts.similarity import SimilarityContract
 from mcp_server.contracts.temporal import TemporalContract
 from mcp_server.protocol import (
@@ -573,3 +577,201 @@ class TestAggregateContract:
         total_from_breakdown = sum(result["vertex_types"].values())
         # Breakdown total should be <= total_vertices (TigerGraph may count sub-types separately)
         assert total_from_breakdown >= 0
+
+
+# ===========================================================================
+# Contract 16 — Subgraph Export
+# ===========================================================================
+
+
+class TestExportContract:
+    @pytest.fixture
+    def exporter(self, adapter: DemoGraphRAGAdapter) -> ExportContract:
+        from mcp_server.contracts.export import ExportContract
+        return ExportContract(adapter)
+
+    def test_export_graphml(self, exporter: ExportContract) -> None:
+        ctx = _make_context(
+            entities=[{"id": "p1", "name": "BERT", "type": "Paper", "relevance_score": 0.9}],
+            relationships=[{"id": "r1", "source": "p1", "target": "p2", "type": "CITES", "weight": 1.0}],
+        )
+        res = exporter.export(ctx, format="graphml")
+        assert res["format"] == "graphml"
+        assert res["mime_type"] == "application/xml"
+        assert "<graphml" in res["content"]
+        assert 'id="p1"' in res["content"]
+        assert "CITES" in res["content"]
+
+    def test_export_cypher(self, exporter: ExportContract) -> None:
+        ctx = _make_context(
+            entities=[{"id": "p1", "name": "BERT", "type": "Paper", "relevance_score": 0.9}],
+            relationships=[{"id": "r1", "source": "p1", "target": "p2", "type": "CITES"}],
+        )
+        res = exporter.export(ctx, format="cypher")
+        assert res["format"] == "cypher"
+        assert "MERGE (n:`Paper`" in res["content"]
+        assert "-[r:`CITES`]->" in res["content"]
+
+    def test_export_json_ld(self, exporter: ExportContract) -> None:
+        ctx = _make_context(
+            entities=[{"id": "p1", "name": "BERT", "type": "Paper"}],
+            relationships=[{"id": "r1", "source": "p1", "target": "p2", "type": "CITES"}],
+        )
+        res = exporter.export(ctx, format="json_ld")
+        assert res["format"] == "json_ld"
+        assert res["mime_type"] == "application/ld+json"
+        doc = json.loads(res["content"])
+        assert "@context" in doc
+        assert "@graph" in doc
+
+    def test_export_rdf_turtle(self, exporter: ExportContract) -> None:
+        ctx = _make_context(
+            entities=[{"id": "p1", "name": "BERT", "type": "Paper"}],
+            relationships=[{"id": "r1", "source": "p1", "target": "p2", "type": "CITES"}],
+        )
+        res = exporter.export(ctx, format="rdf_turtle")
+        assert res["format"] == "rdf_turtle"
+        assert "@prefix" in res["content"]
+        assert "ent:p1" in res["content"]
+
+    def test_export_unsupported_format_raises(self, exporter: ExportContract) -> None:
+        ctx = _make_context()
+        with pytest.raises(ValueError, match="Unsupported format"):
+            exporter.export(ctx, format="yaml")
+
+
+# ===========================================================================
+# Contract 17 — Batch Execution
+# ===========================================================================
+
+
+class TestBatchContract:
+    def test_batch_execution_success(self) -> None:
+        from mcp_server.contracts.batch import BatchContract
+
+        def mock_executor(name: str, args: dict) -> Any:
+            return {"echo": name, "args": args}
+
+        batcher = BatchContract(mock_executor)
+        calls = [
+            {"tool": "tool_a", "arguments": {"x": 1}},
+            {"tool": "tool_b", "arguments": {"y": 2}},
+        ]
+        res = batcher.execute_batch(calls)
+        assert res["total"] == 2
+        assert res["successful"] == 2
+        assert res["results"][0]["result"]["echo"] == "tool_a"
+        assert res["results"][1]["result"]["echo"] == "tool_b"
+
+    def test_batch_exceeds_limit_raises(self) -> None:
+        from mcp_server.contracts.batch import BatchContract
+        batcher = BatchContract(lambda n, a: None)
+        calls = [{"tool": f"t_{i}"} for i in range(26)]
+        with pytest.raises(ValueError, match="exceeds maximum limit"):
+            batcher.execute_batch(calls)
+
+
+# ===========================================================================
+# Contract 18 — Watch & Persistent Storage
+# ===========================================================================
+
+
+class TestWatchContract:
+    def test_watch_returns_events(self) -> None:
+        from mcp_server.contracts.watch import WatchContract
+        from mcp_server.storage import PersistentStorage
+
+        store = PersistentStorage.get_instance()
+        store.append_event(
+            event_id="evt_test_watch",
+            event_type="entity_created",
+            graph_id="test_g",
+            timestamp="2026-09-20T23:00:00Z",
+            entity_id="paper:test",
+            entity_type="Paper",
+            payload={"action": "created"},
+        )
+        watcher = WatchContract(store)
+        res = watcher.watch(graph_id="test_g", event_types=["entity_created"])
+        assert res["total_events"] >= 1
+        assert any(e["event_id"] == "evt_test_watch" for e in res["events"])
+
+
+# ===========================================================================
+# 5-Tier RBAC & Capability Tokens
+# ===========================================================================
+
+
+class TestCapabilityTokens:
+    def test_issue_and_verify_capability_token(self) -> None:
+        from mcp_server.contracts.authorization import AuthorizationContract
+
+        auth = AuthorizationContract(admin_token="admin_secret")
+        token = auth.issue_capability_token(role="analyst", admin_token="admin_secret")
+        assert token.startswith("cap_")
+
+        claims = auth.verify_capability_token(token)
+        assert claims is not None
+        assert claims["role"] == "analyst"
+
+        # Permission check via capability token
+        res = auth.check_permission("export_subgraph", token=token)
+        assert res.allowed is True
+
+        # Denied operation for analyst role
+        res_delete = auth.check_permission("delete_document", token=token)
+        assert res_delete.allowed is False
+
+
+# ===========================================================================
+# Query Cache & Rate Limiting
+# ===========================================================================
+
+
+class TestQueryCacheAndRateLimiter:
+    def test_query_cache_put_get_invalidate(self) -> None:
+        from mcp_server.cache import QueryCache
+
+        cache = QueryCache.get_instance()
+        key = cache.make_key("test_tool", {"a": 1, "b": "hello"})
+        cache.set(key, "test_tool", {"val": 42}, graph_id="test_graph")
+
+        val = cache.get(key)
+        assert val is not None
+        assert val["val"] == 42
+
+        cache.invalidate(graph_id="test_graph")
+        assert cache.get(key) is None
+
+    def test_rate_limiter_allows_and_throttles(self) -> None:
+        from mcp_server.rate_limiter import RateLimiter
+
+        limiter = RateLimiter(limits={"read": 2})
+        allowed1, _ = limiter.check("client_1", "graphrag_search")
+        allowed2, _ = limiter.check("client_1", "graphrag_search")
+        allowed3, retry_after = limiter.check("client_1", "graphrag_search")
+
+        assert allowed1 is True
+        assert allowed2 is True
+        assert allowed3 is False
+        assert retry_after > 0.0
+
+
+# ===========================================================================
+# Neo4j Adapter
+# ===========================================================================
+
+
+class TestNeo4jAdapter:
+    def test_neo4j_adapter_instantiation_and_normalization(self) -> None:
+        from mcp_server.adapters.neo4j_adapter import Neo4jGraphRAGAdapter
+
+        adapter = Neo4jGraphRAGAdapter(uri="bolt://localhost:7687", username="neo4j", password="pwd")
+        normalized = adapter._normalize_node(
+            {"id": "p:1", "name": "Sample", "labels": ["Paper"], "properties": {"year": 2024}},
+            relevance=0.85,
+        )
+        assert normalized["id"] == "p:1"
+        assert normalized["type"] == "Paper"
+        assert normalized["relevance_score"] == 0.85
+
