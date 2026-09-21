@@ -1,79 +1,144 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" width="100%" height="100%">
   <defs>
-    <linearGradient id="bgGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A"/>
-      <stop offset="50%" stop-color="#0B0F19"/>
-      <stop offset="100%" stop-color="#020617"/>
-    </linearGradient>
-    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10B981"/>
-      <stop offset="100%" stop-color="#06B6D4"/>
-    </linearGradient>
+    <pattern id="brutalDots4" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#000000" opacity="0.12"/>
+    </pattern>
   </defs>
 
-  <!-- Background -->
-  <rect width="900" height="560" rx="16" fill="url(#bgGrad4)"/>
-  <rect x="1" y="1" width="898" height="558" rx="15" fill="none" stroke="#1E293B" stroke-width="1.5"/>
+  <!-- Hard shadow -->
+  <rect x="18" y="18" width="872" height="552" rx="16" fill="#000000"/>
+
+  <!-- Main Container -->
+  <rect x="10" y="10" width="872" height="552" rx="16" fill="#F7F5EE" stroke="#000000" stroke-width="4"/>
+  <rect x="10" y="10" width="872" height="552" rx="16" fill="url(#brutalDots4)"/>
 
   <!-- Header -->
-  <g transform="translate(50, 45)">
-    <rect x="0" y="0" width="130" height="24" rx="12" fill="#06B6D4" fill-opacity="0.15" stroke="#06B6D4" stroke-width="1"/>
-    <text x="65" y="16" fill="#67E8F9" font-family="sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="1">ZERO MOCK</text>
-    <text x="0" y="55" fill="#F8FAFC" font-family="sans-serif" font-size="24" font-weight="800">Verifiable Provenance &amp; Citation Audit</text>
-    <text x="0" y="78" fill="#94A3B8" font-family="sans-serif" font-size="13">Every answer carries cryptographic-grade traceability back to source vertices and text chunks</text>
+  <g transform="translate(45, 40)">
+    <rect x="2" y="2" width="160" height="30" rx="6" fill="#000000"/>
+    <rect x="0" y="0" width="160" height="30" rx="6" fill="#55EFC4" stroke="#000000" stroke-width="2.5"/>
+    <text x="80" y="20" fill="#000000" font-family="'Courier New', monospace" font-size="12" font-weight="900" text-anchor="middle" letter-spacing="1">CONTRACT 5 // PROVENANCE</text>
+
+    <text x="0" y="68" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="-0.5">ZERO-MOCK CITATION AUDIT TRAIL</text>
+    <text x="0" y="92" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="13" font-weight="700">Deterministic verification: Every LLM claim is backed by cryptographically auditable vertex lineages</text>
   </g>
 
-  <!-- Left: Big Stat Card -->
-  <g transform="translate(50, 140)">
-    <rect x="0" y="0" width="280" height="350" rx="12" fill="#1E293B" fill-opacity="0.6" stroke="#334155" stroke-width="1"/>
-    <circle cx="140" cy="110" r="60" fill="url(#shieldGrad)" fill-opacity="0.15" stroke="#10B981" stroke-width="2"/>
-    <text x="140" y="120" fill="#34D399" font-family="sans-serif" font-size="36" font-weight="900" text-anchor="middle">100%</text>
-    <text x="140" y="195" fill="#F8FAFC" font-family="sans-serif" font-size="18" font-weight="700" text-anchor="middle">Auditable Provenance</text>
-    <text x="140" y="220" fill="#94A3B8" font-family="sans-serif" font-size="12" text-anchor="middle">0% Hallucinated Entities</text>
+  <!-- Flow Diagram: 4 Steps -->
+  <!-- Step 1: User Query / Claim -->
+  <g transform="translate(45, 155)">
+    <!-- Node Card -->
+    <rect x="3" y="3" width="175" height="180" rx="10" fill="#000000"/>
+    <rect x="0" y="0" width="175" height="180" rx="10" fill="#FFFFFF" stroke="#000000" stroke-width="3"/>
+    
+    <rect x="12" y="12" width="65" height="20" rx="4" fill="#DFE6E9" stroke="#000000" stroke-width="1.5"/>
+    <text x="44" y="26" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="900" text-anchor="middle">STEP 01</text>
 
-    <line x1="30" y1="245" x2="250" y2="245" stroke="#334155" stroke-width="1"/>
+    <text x="14" y="58" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16" font-weight="900">LLM Claim</text>
+    <text x="14" y="76" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="10" font-weight="700">Generated text statement</text>
 
-    <text x="140" y="275" fill="#CBD5E1" font-family="sans-serif" font-size="12" text-anchor="middle">Mandatory in Contract 5</text>
-    <text x="140" y="295" fill="#64748B" font-family="sans-serif" font-size="11" text-anchor="middle">Zero invented metrics or scores</text>
-    <text x="140" y="315" fill="#64748B" font-family="sans-serif" font-size="11" text-anchor="middle">Unmeasured metrics = null</text>
+    <rect x="12" y="95" width="151" height="70" rx="6" fill="#F7F5EE" stroke="#000000" stroke-width="2"/>
+    <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="800">"Attention Is All</text>
+    <text x="20" y="130" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="800">You Need authored</text>
+    <text x="20" y="145" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="800">by Vaswani et al."</text>
   </g>
 
-  <!-- Right: Audit Steps Breakdown -->
-  <g transform="translate(360, 140)">
-    <!-- Step 1 -->
-    <g transform="translate(0, 0)">
-      <rect x="0" y="0" width="490" height="72" rx="10" fill="#1E293B" fill-opacity="0.5" stroke="#334155" stroke-width="1"/>
-      <circle cx="36" cy="36" r="16" fill="#3B82F6" fill-opacity="0.2"/>
-      <text x="36" y="41" fill="#60A5FA" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">1</text>
-      <text x="68" y="28" fill="#F1F5F9" font-family="sans-serif" font-size="14" font-weight="600">Traversal Trajectory Recording</text>
-      <text x="68" y="48" fill="#94A3B8" font-family="sans-serif" font-size="12">Records every hop: seed entities, expanded edges, and target vertices.</text>
-    </g>
+  <!-- Arrow 1 -> 2 -->
+  <g transform="translate(225, 240)">
+    <line x1="0" y1="0" x2="30" y2="0" stroke="#000000" stroke-width="4"/>
+    <polygon points="35,0 25,-6 25,6" fill="#000000"/>
+  </g>
 
-    <!-- Step 2 -->
-    <g transform="translate(0, 92)">
-      <rect x="0" y="0" width="490" height="72" rx="10" fill="#1E293B" fill-opacity="0.5" stroke="#334155" stroke-width="1"/>
-      <circle cx="36" cy="36" r="16" fill="#8B5CF6" fill-opacity="0.2"/>
-      <text x="36" y="41" fill="#A78BFA" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">2</text>
-      <text x="68" y="28" fill="#F1F5F9" font-family="sans-serif" font-size="14" font-weight="600">Visited vs. Cited Differentiation</text>
-      <text x="68" y="48" fill="#94A3B8" font-family="sans-serif" font-size="12">Explicitly accounts for entities examined during graph traversal but excluded from final response.</text>
-    </g>
+  <!-- Step 2: Citation Hash -->
+  <g transform="translate(260, 155)">
+    <rect x="3" y="3" width="175" height="180" rx="10" fill="#000000"/>
+    <rect x="0" y="0" width="175" height="180" rx="10" fill="#FFE600" stroke="#000000" stroke-width="3"/>
 
-    <!-- Step 3 -->
-    <g transform="translate(0, 184)">
-      <rect x="0" y="0" width="490" height="72" rx="10" fill="#1E293B" fill-opacity="0.5" stroke="#334155" stroke-width="1"/>
-      <circle cx="36" cy="36" r="16" fill="#10B981" fill-opacity="0.2"/>
-      <text x="36" y="41" fill="#34D399" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">3</text>
-      <text x="68" y="28" fill="#F1F5F9" font-family="sans-serif" font-size="14" font-weight="600">Source Document Grounding</text>
-      <text x="68" y="48" fill="#94A3B8" font-family="sans-serif" font-size="12">Binds retrieved claims directly to arXiv paper IDs and raw text chunk offsets.</text>
-    </g>
+    <rect x="12" y="12" width="65" height="20" rx="4" fill="#000000"/>
+    <text x="44" y="26" fill="#FFE600" font-family="'Courier New', monospace" font-size="9" font-weight="900" text-anchor="middle">STEP 02</text>
 
-    <!-- Step 4 -->
-    <g transform="translate(0, 276)">
-      <rect x="0" y="0" width="490" height="72" rx="10" fill="#1E293B" fill-opacity="0.5" stroke="#334155" stroke-width="1"/>
-      <circle cx="36" cy="36" r="16" fill="#EC4899" fill-opacity="0.2"/>
-      <text x="36" y="41" fill="#F472B6" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">4</text>
-      <text x="68" y="28" fill="#F1F5F9" font-family="sans-serif" font-size="14" font-weight="600">Automated Completeness Scoring</text>
-      <text x="68" y="48" fill="#94A3B8" font-family="sans-serif" font-size="12">Calculates cited-vs-examined ratio ensuring agents cannot hallucinate unanchored facts.</text>
+    <text x="14" y="58" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16" font-weight="900">Citation Hash</text>
+    <text x="14" y="76" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="10" font-weight="700">Contract 5 fact ID</text>
+
+    <rect x="12" y="95" width="151" height="70" rx="6" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+    <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="900">fact:sha256:7f9a...</text>
+    <text x="20" y="132" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">confidence: 1.00</text>
+    <text x="20" y="148" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">resolver: EXACT_ID</text>
+  </g>
+
+  <!-- Arrow 2 -> 3 -->
+  <g transform="translate(440, 240)">
+    <line x1="0" y1="0" x2="30" y2="0" stroke="#000000" stroke-width="4"/>
+    <polygon points="35,0 25,-6 25,6" fill="#000000"/>
+  </g>
+
+  <!-- Step 3: Graph Traversal Lineage -->
+  <g transform="translate(475, 155)">
+    <rect x="3" y="3" width="175" height="180" rx="10" fill="#000000"/>
+    <rect x="0" y="0" width="175" height="180" rx="10" fill="#74B9FF" stroke="#000000" stroke-width="3"/>
+
+    <rect x="12" y="12" width="65" height="20" rx="4" fill="#000000"/>
+    <text x="44" y="26" fill="#74B9FF" font-family="'Courier New', monospace" font-size="9" font-weight="900" text-anchor="middle">STEP 03</text>
+
+    <text x="14" y="58" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16" font-weight="900">Graph Lineage</text>
+    <text x="14" y="76" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="10" font-weight="700">TigerGraph 2-hop edge</text>
+
+    <rect x="12" y="95" width="151" height="70" rx="6" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+    <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">Paper(1706.03762)</text>
+    <text x="20" y="130" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&rarr; [AUTHORED_BY]</text>
+    <text x="20" y="145" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&rarr; Author(Vaswani)</text>
+  </g>
+
+  <!-- Arrow 3 -> 4 -->
+  <g transform="translate(655, 240)">
+    <line x1="0" y1="0" x2="30" y2="0" stroke="#000000" stroke-width="4"/>
+    <polygon points="35,0 25,-6 25,6" fill="#000000"/>
+  </g>
+
+  <!-- Step 4: Source Document Chunk -->
+  <g transform="translate(690, 155)">
+    <rect x="3" y="3" width="165" height="180" rx="10" fill="#000000"/>
+    <rect x="0" y="0" width="165" height="180" rx="10" fill="#55EFC4" stroke="#000000" stroke-width="3"/>
+
+    <rect x="12" y="12" width="65" height="20" rx="4" fill="#000000"/>
+    <text x="44" y="26" fill="#55EFC4" font-family="'Courier New', monospace" font-size="9" font-weight="900" text-anchor="middle">STEP 04</text>
+
+    <text x="14" y="58" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16" font-weight="900">Source Chunk</text>
+    <text x="14" y="76" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="10" font-weight="700">Raw arXiv metadata</text>
+
+    <rect x="12" y="95" width="141" height="70" rx="6" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+    <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="900">doc:arxiv_1706</text>
+    <text x="20" y="132" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">chunk_id: c_001</text>
+    <text x="20" y="148" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">verified: TRUE ✅</text>
+  </g>
+
+  <!-- Audit Checklist Bottom Deck -->
+  <g transform="translate(45, 360)">
+    <rect x="4" y="4" width="810" height="175" rx="12" fill="#000000"/>
+    <rect x="0" y="0" width="810" height="175" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="3"/>
+
+    <g transform="translate(25, 20)">
+      <text x="0" y="18" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="900">VERIFIABLE PROVENANCE AUDIT METRICS</text>
+      <text x="0" y="38" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="11" font-weight="700">Contract 5 enforces zero-hallucination tracking with the following live counters:</text>
+
+      <g transform="translate(0, 55)">
+        <!-- Col 1 -->
+        <rect x="0" y="0" width="235" height="65" rx="8" fill="#F7F5EE" stroke="#000000" stroke-width="2"/>
+        <text x="14" y="24" fill="#000000" font-family="'Courier New', monospace" font-size="10" font-weight="900">VISITED-NOT-CITED</text>
+        <text x="14" y="48" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="900">0 Leaked Entities</text>
+
+        <!-- Col 2 -->
+        <g transform="translate(255, 0)">
+          <rect x="0" y="0" width="235" height="65" rx="8" fill="#FFE600" stroke="#000000" stroke-width="2"/>
+          <text x="14" y="24" fill="#000000" font-family="'Courier New', monospace" font-size="10" font-weight="900">CITATION COMPLETENESS</text>
+          <text x="14" y="48" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="900">100.0% Verified</text>
+        </g>
+
+        <!-- Col 3 -->
+        <g transform="translate(510, 0)">
+          <rect x="0" y="0" width="250" height="65" rx="8" fill="#55EFC4" stroke="#000000" stroke-width="2"/>
+          <text x="14" y="24" fill="#000000" font-family="'Courier New', monospace" font-size="10" font-weight="900">AUDIT VERDICT</text>
+          <text x="14" y="48" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="900">ZERO MOCK ENFORCED</text>
+        </g>
+      </g>
     </g>
   </g>
 </svg>

@@ -87,12 +87,12 @@ export default function BenchmarkGallery() {
           </a>
         </div>
 
-        <div className="relative rounded-2xl border-4 border-black bg-slate-950 p-3 shadow-brutal-xl">
+        <div className="relative rounded-2xl border-3 border-black bg-[#F7F5EE] p-3 sm:p-6 shadow-brutal-lg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selected.filename}
             alt={selected.title}
-            className="w-full h-auto rounded-xl object-contain"
+            className="w-full h-auto rounded-xl object-contain border-2 border-black/10 shadow-sm"
           />
         </div>
       </div>

@@ -1,12 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getGraphVisualization } from "../../lib/api";
 import type { Entity, Relationship, SubgraphContext } from "../../lib/types";
-import GraphView, { type GraphNode, type GraphEdge } from "../../components/graph/GraphView";
+import type { GraphNode, GraphEdge } from "../../components/graph/GraphView";
 import EntityDetails from "../../components/graph/EntityDetails";
 import LoadingSpinner from "../../components/shared/LoadingSpinner";
 import ErrorState from "../../components/shared/ErrorState";
+
+const GraphView = dynamic(() => import("../../components/graph/GraphView"), {
+  ssr: false,
+  loading: () => <LoadingSpinner label="Initializing 3D graph canvas..." />,
+});
 
 export default function GraphPage() {
   const [loading, setLoading] = useState(true);
