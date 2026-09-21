@@ -193,12 +193,16 @@ def _load_benchmark_queries(limit: int = 3) -> list[dict[str, Any]]:
 # App + endpoints
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="GraphRAG Protocol Demo Server", version="0.3.0")
+cors_env = os.environ.get("CORS_ORIGINS", "*")
+allowed_origins = [o.strip() for o in cors_env.split(",")] if cors_env != "*" else ["*"]
+
+app = FastAPI(title="GraphRAG Protocol Server", version="0.4.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "X-Admin-Token"],
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -334,8 +338,8 @@ async def stream_events(event_types: str | None = None, replay: bool = False) ->
 def main() -> None:
     import uvicorn
 
-    host = os.environ.get("DEMO_HOST", "127.0.0.1")
-    port = int(os.environ.get("DEMO_PORT", "8000"))
+    host = os.environ.get("HOST", os.environ.get("DEMO_HOST", "0.0.0.0"))
+    port = int(os.environ.get("PORT", os.environ.get("DEMO_PORT", "8000")))
     uvicorn.run("mcp_server.server:app", host=host, port=port, reload=False)
 
 

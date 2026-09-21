@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: grip-protocol-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -e ".[server,tigergraph,llm]"
+    startCommand: python -m mcp_server.server
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: GOOGLE_API_KEY
+        value: AIzaSyDnVSVAVUe41j0Bel47hozVWDgi7pFdzcg
+      - key: LLM_MODEL
+        value: gemini-2.5-flash
+      - key: LLM_FALLBACK_MODEL
+        value: gemini-2.5-flash
+      - key: TIGERGRAPH_HOST
+        value: https://tg-a2a51931-c368-42cf-8b08-70bbfa56410a.tg-3452941248.i.tgcloud.io
+      - key: TIGERGRAPH_PORT
+        value: "443"
+      - key: TIGERGRAPH_USERNAME
+        value: tigergraph
+      - key: TIGERGRAPH_GSQL_SECRET
+        value: qd1jh6u1vvdi4h5bon4ob982qsu3jlpf
+      - key: TIGERGRAPH_GRAPH_NAME
+        value: GraphragProtocol
+      - key: TIGERGRAPH_USE_SSL
+        value: "true"
+      - key: TIGERGRAPH_WORKSPACE_ID
+        value: a2a51931-c368-42cf-8b08-70bbfa56410a
+      - key: GRAPHRAG_ADMIN_TOKEN
+        value: iv9i34kubdB6Iu1kSwWk3jkOi_rbNBLYLOVseBAFV54
+      - key: CORS_ORIGINS
+        value: "*"
