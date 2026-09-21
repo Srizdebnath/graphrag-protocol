@@ -15,8 +15,11 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "GraphRAG Protocol Dashboard",
-  description: "Universal GraphRAG Interoperability Protocol — interactive dashboard",
+  title: "GRIP // Universal GraphRAG Interoperability Protocol",
+  description: "Universal GraphRAG Interoperability Protocol — interactive dashboard, wire contracts, and IDE connect guides",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
