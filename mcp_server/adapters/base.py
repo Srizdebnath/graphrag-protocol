@@ -126,3 +126,7 @@ class BaseGraphRAGAdapter(ABC):
         typically ``backend`` and ``version`` keys.
         """
         ...
+
+    def embed_text(self, text: str) -> list[float] | None:
+        """Optional vector embedding for semantic similarity (Contract 11)."""
+        return None

@@ -249,11 +249,32 @@ def _json(obj: Any) -> str:
     return json.dumps(obj, indent=2, default=str)
 
 
+def _safe_tool(fn):
+    """Wrap an MCP tool handler so unhandled exceptions become JSON error responses."""
+    import functools
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "error_type": type(exc).__name__})
+    return wrapper
+
+
+def _parse_context(context_json: str | None) -> dict[str, Any] | None:
+    """Parse a JSON string into a context dict, or return None."""
+    if context_json is None:
+        return None
+    if isinstance(context_json, dict):
+        return context_json
+    return json.loads(context_json)
+
+
 def build_server() -> MCPServer:
     """Construct the MCP server with all 50 tools, resources, and prompts registered."""
     mcp = MCPServer(
         name="grip",
-        version="0.3.0",
+        version="0.4.0",
         instructions=(
             "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
             "Use graphrag_search for natural-language queries, graphrag_agent_investigate for "
@@ -341,17 +362,23 @@ def build_server() -> MCPServer:
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         explain: bool = False,
     ) -> str:
+        if not query or not str(query).strip():
+            return _json({"error": "query must be a non-empty string", "results": {"entities": [], "relationships": []}})
+
         cache_key = QueryCache.make_key("search", {"q": query, "m": mode, "d": depth, "k": top_k, "exp": explain})
         cached = STATE._cache.get(cache_key)
         if cached:
             return _json(cached)
 
-        res = STATE.retrieval.search(query=query, mode=mode, depth=depth, top_k=top_k)
-        payload = _context_payload(res.context, format_text=format_text, max_tokens=max_tokens)
-        if explain:
-            payload["why_retrieved"] = STATE.explanation.explain(res.context, max_entities=top_k)
-        STATE._cache.set(cache_key, "search", payload)
-        return _json(payload)
+        try:
+            res = STATE.retrieval.search(query=query, mode=mode, depth=depth, top_k=top_k)
+            payload = _context_payload(res.context, format_text=format_text, max_tokens=max_tokens)
+            if explain:
+                payload["why_retrieved"] = STATE.explanation.explain(res.context, max_entities=top_k)
+            STATE._cache.set(cache_key, "search", payload)
+            return _json(payload)
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "results": {"entities": [], "relationships": []}})
 
     @mcp.tool(
         name="graphrag_local_search",
@@ -366,8 +393,13 @@ def build_server() -> MCPServer:
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = STATE.retrieval.local_search(query=query, entity_hints=entity_hints, depth=depth, top_k=top_k)
-        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        if not query or not str(query).strip():
+            return _json({"error": "query must be a non-empty string", "results": {"entities": [], "relationships": []}})
+        try:
+            ctx = STATE.retrieval.local_search(query=query, entity_hints=entity_hints, depth=depth, top_k=top_k)
+            return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "results": {"entities": [], "relationships": []}})
 
     @mcp.tool(
         name="graphrag_global_search",
@@ -381,8 +413,13 @@ def build_server() -> MCPServer:
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = STATE.retrieval.global_search(query=query, community_level=community_level, top_communities=top_communities)
-        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        if not query or not str(query).strip():
+            return _json({"error": "query must be a non-empty string", "results": {"entities": [], "relationships": []}})
+        try:
+            ctx = STATE.retrieval.global_search(query=query, community_level=community_level, top_communities=top_communities)
+            return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "results": {"entities": [], "relationships": []}})
 
     @mcp.tool(
         name="graphrag_hybrid_search",
@@ -398,10 +435,15 @@ def build_server() -> MCPServer:
         format_text: str = "none",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
-        ctx = STATE.retrieval.hybrid_search(
-            query=query, vector_weight=vector_weight, graph_weight=graph_weight, depth=depth, top_k=top_k
-        )
-        return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        if not query or not str(query).strip():
+            return _json({"error": "query must be a non-empty string", "results": {"entities": [], "relationships": []}})
+        try:
+            ctx = STATE.retrieval.hybrid_search(
+                query=query, vector_weight=vector_weight, graph_weight=graph_weight, depth=depth, top_k=top_k
+            )
+            return _json(_context_payload(ctx, format_text=format_text, max_tokens=max_tokens))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "results": {"entities": [], "relationships": []}})
 
     @mcp.tool(
         name="graphrag_entity",
@@ -485,7 +527,12 @@ def build_server() -> MCPServer:
     )
     def graphrag_entity_types(graph_id: str | None = None) -> str:
         types = STATE.schema.get_entity_types(graph_id=graph_id)
-        return _json([t.model_dump(mode="json") for t in types])
+        result = []
+        for t in types:
+            d = t.model_dump(mode="json")
+            d["name"] = t.type
+            result.append(d)
+        return _json(result)
 
     @mcp.tool(
         name="graphrag_relationship_types",
@@ -494,7 +541,12 @@ def build_server() -> MCPServer:
     )
     def graphrag_relationship_types(graph_id: str | None = None) -> str:
         types = STATE.schema.get_relationship_types(graph_id=graph_id)
-        return _json([t.model_dump(mode="json") for t in types])
+        result = []
+        for t in types:
+            d = t.model_dump(mode="json")
+            d["name"] = t.type
+            result.append(d)
+        return _json(result)
 
     @mcp.tool(
         name="graphrag_sample",
@@ -502,7 +554,12 @@ def build_server() -> MCPServer:
         description="Sample entities of a given vertex type for schema context.",
     )
     def graphrag_sample(entity_type: str, count: int = 5, graph_id: str | None = None) -> str:
-        return _json(STATE.schema.get_sample_entities(entity_type=entity_type, count=count, graph_id=graph_id))
+        if not entity_type or not str(entity_type).strip():
+            return _json({"error": "entity_type must be a non-empty string", "samples": []})
+        try:
+            return _json(STATE.schema.get_sample_entities(entity_type=entity_type.strip(), count=count, graph_id=graph_id))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "samples": []})
 
     # ------------------------------------------------------------------
     # Contract 5 — Provenance Tools
@@ -538,9 +595,14 @@ def build_server() -> MCPServer:
         title="Provenance audit",
         description="Audit completeness score for a SubgraphContext provenance trail.",
     )
-    def graphrag_audit(context: dict[str, Any]) -> str:
-        prov = STATE.provenance._coerce_provenance(context.get("provenance"))
-        return _json(STATE.provenance.audit_provenance_completeness(prov))
+    def graphrag_audit(context: dict[str, Any] | str) -> str:
+        try:
+            if isinstance(context, str):
+                context = json.loads(context)
+            prov = STATE.provenance._coerce_provenance(context.get("provenance"))
+            return _json(STATE.provenance.audit_provenance_completeness(prov))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc)})
 
     # ------------------------------------------------------------------
     # Contract 8 — Formatting Tool
@@ -552,16 +614,18 @@ def build_server() -> MCPServer:
         description="Format a SubgraphContext envelope into bounded, LLM-ready text.",
     )
     def graphrag_format(
-        context: dict[str, Any],
+        context: dict[str, Any] | str,
         format_text: str = "markdown",
         max_tokens: int = _DEFAULT_MAX_TOKENS,
     ) -> str:
         try:
+            if isinstance(context, str):
+                context = json.loads(context)
             ctx = SubgraphContext(**context)
+            formatted = _format(ctx, format_text=format_text, max_tokens=max_tokens)
+            return formatted or _json(ctx.model_dump(mode="json"))
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context structure: {exc}"})
-        formatted = _format(ctx, format_text=format_text, max_tokens=max_tokens)
-        return formatted or _json(ctx.model_dump(mode="json"))
 
     # ------------------------------------------------------------------
     # Admin / Status Tools
@@ -592,7 +656,7 @@ def build_server() -> MCPServer:
     def graphrag_config() -> str:
         return _json({
             "protocol": "graphrag/1.0",
-            "server_version": "0.2.0",
+            "server_version": "0.4.0",
             "backend_adapter": type(STATE.adapter).__name__,
             "default_max_tokens": _DEFAULT_MAX_TOKENS,
             "extraction_strategy": _DEFAULT_EXTRACTION_STRATEGY,
@@ -625,29 +689,33 @@ def build_server() -> MCPServer:
         if not decision.allowed:
             return _json({"error": "permission denied", **decision.model_dump()})
 
+        target_graph = getattr(STATE.adapter, "_graphname", None) or os.environ.get("TIGERGRAPH_GRAPH_NAME", "default")
         if async_mode:
             job_id = f"job-{uuid.uuid4().hex[:8]}"
-            STATE._storage.save_job(job_id=job_id, status="running", graph_id="default", document_count=len(documents))
+            STATE._storage.save_job(job_id=job_id, status="running", graph_id=target_graph, document_count=len(documents))
 
             def _bg_run():
                 try:
-                    cfg = IngestionConfig(extraction_strategy=extraction_strategy)
+                    cfg = IngestionConfig(graph_id=target_graph, extraction_strategy=extraction_strategy)
                     rep = STATE.construction.ingest(documents, config=cfg)
                     STATE._storage.save_job(
-                        job_id=job_id, status="completed", graph_id="default",
+                        job_id=job_id, status="completed", graph_id=target_graph,
                         document_count=len(documents), report=rep.model_dump(mode="json")
                     )
                     STATE._cache.invalidate()
                 except Exception as ex:  # noqa: BLE001
-                    STATE._storage.save_job(job_id=job_id, status="failed", graph_id="default", error=str(ex))
+                    STATE._storage.save_job(job_id=job_id, status="failed", graph_id=target_graph, error=str(ex))
 
             asyncio.get_event_loop().run_in_executor(None, _bg_run)
             return _json({"job_id": job_id, "status": "running", "message": "Ingestion job launched in background"})
 
-        cfg = IngestionConfig(extraction_strategy=extraction_strategy)
-        report = STATE.construction.ingest(documents, config=cfg)
-        STATE._cache.invalidate()
-        return _json(report.model_dump(mode="json"))
+        try:
+            cfg = IngestionConfig(graph_id=target_graph, extraction_strategy=extraction_strategy)
+            report = STATE.construction.ingest(documents, config=cfg)
+            STATE._cache.invalidate()
+            return _json(report.model_dump(mode="json"))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "status": "failed"})
 
     @mcp.tool(
         name="graphrag_delete_document",
@@ -658,9 +726,12 @@ def build_server() -> MCPServer:
         decision = STATE.authorization.check_permission("delete_document", token=admin_token)
         if not decision.allowed:
             return _json({"error": "permission denied", **decision.model_dump()})
-        report = STATE.construction.delete_document(document_id)
-        STATE._cache.invalidate()
-        return _json(report.model_dump(mode="json"))
+        try:
+            report = STATE.construction.delete_document(document_id)
+            STATE._cache.invalidate()
+            return _json(report.model_dump(mode="json"))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "status": "failed"})
 
     # ------------------------------------------------------------------
     # Contract 6 — Federation Tools
@@ -831,35 +902,39 @@ def build_server() -> MCPServer:
     @mcp.tool(
         name="graphrag_explain",
         title="Explain retrieval",
-        description="Generate natural-language explanations for why entities were retrieved for a query or in a SubgraphContext. Accepts either 'query' string or 'context' dictionary.",
+        description="Generate natural-language explanations for why entities were retrieved for a query or in a SubgraphContext. Accepts either 'query' string or 'context' dictionary or JSON string.",
     )
     def graphrag_explain(
         query: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | str | None = None,
         max_entities: int = 10,
     ) -> str:
-        if context is None and not query:
-            return _json({"error": "Either 'query' or 'context' must be provided."})
-        if context is None and query:
-            ctx = STATE.retrieval.search(query=query, mode="auto").context
-        else:
-            try:
+        try:
+            if isinstance(context, str):
+                context = json.loads(context)
+            if context is None and not query:
+                return _json({"error": "Either 'query' or 'context' must be provided."})
+            if context is None and query:
+                ctx = STATE.retrieval.search(query=query, mode="auto").context
+            else:
                 ctx = SubgraphContext(**context)
-            except Exception as exc:  # noqa: BLE001
-                return _json({"error": f"Invalid context: {exc}"})
-        return _json(STATE.explanation.explain(ctx, max_entities=max_entities))
+            return _json(STATE.explanation.explain(ctx, max_entities=max_entities))
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc)})
 
     @mcp.tool(
         name="graphrag_explain_path",
         title="Explain path",
         description="Explain the reasoning behind each path found in a path_search SubgraphContext.",
     )
-    def graphrag_explain_path(context: dict[str, Any]) -> str:
+    def graphrag_explain_path(context: dict[str, Any] | str) -> str:
         try:
+            if isinstance(context, str):
+                context = json.loads(context)
             ctx = SubgraphContext(**context)
+            return _json(STATE.explanation.explain_path(ctx))
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(STATE.explanation.explain_path(ctx))
 
     # ------------------------------------------------------------------
     # Contract 14 — Diff Tools
@@ -871,17 +946,21 @@ def build_server() -> MCPServer:
         description="Structural delta between two SubgraphContext envelopes.",
     )
     def graphrag_diff(
-        context_a: dict[str, Any],
-        context_b: dict[str, Any],
+        context_a: dict[str, Any] | str,
+        context_b: dict[str, Any] | str,
         label_a: str = "a",
         label_b: str = "b",
     ) -> str:
         try:
+            if isinstance(context_a, str):
+                context_a = json.loads(context_a)
+            if isinstance(context_b, str):
+                context_b = json.loads(context_b)
             ctx_a = SubgraphContext(**context_a)
             ctx_b = SubgraphContext(**context_b)
+            return _json(STATE.diff.diff_contexts(ctx_a, ctx_b, label_a=label_a, label_b=label_b))
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(STATE.diff.diff_contexts(ctx_a, ctx_b, label_a=label_a, label_b=label_b))
 
     @mcp.tool(
         name="graphrag_diff_queries",
@@ -974,12 +1053,14 @@ def build_server() -> MCPServer:
         title="Export subgraph format",
         description="Export a SubgraphContext into portable graphml, cypher, json_ld, or rdf_turtle.",
     )
-    def graphrag_export_subgraph(context: dict[str, Any], format: str = "graphml") -> str:
+    def graphrag_export_subgraph(context: dict[str, Any] | str, format: str = "graphml") -> str:
         try:
+            if isinstance(context, str):
+                context = json.loads(context)
             ctx = SubgraphContext(**context)
+            return _json(STATE.export.export(ctx, format=format))
         except Exception as exc:  # noqa: BLE001
             return _json({"error": f"Invalid context: {exc}"})
-        return _json(STATE.export.export(ctx, format=format))
 
     # ------------------------------------------------------------------
     # Contract 17 — Batch Execution
@@ -1083,29 +1164,31 @@ def build_server() -> MCPServer:
         description=(
             "Detect and resolve conflicting properties, claims, or relationships on a topic or within a SubgraphContext "
             "using temporal recency and source authority. Accepts either a natural-language 'query' string (auto-retrieves "
-            "the subgraph context) OR a pre-existing 'context' dictionary."
+            "the subgraph context) OR a pre-existing 'context' dictionary or JSON-string."
         ),
     )
     def graphrag_resolve_conflicts(
         query: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: dict[str, Any] | str | None = None,
         recency_weight: float = 0.6,
         authority_weight: float = 0.4,
     ) -> str:
-        if context is None and not query:
-            return _json({"error": "Either 'query' or 'context' must be provided to resolve conflicts."})
-        if context is None and query:
-            ctx = STATE.retrieval.search(query=query, mode="auto").context
-        else:
-            try:
+        try:
+            if isinstance(context, str):
+                context = json.loads(context)
+            if context is None and not query:
+                return _json({"error": "Either 'query' or 'context' must be provided to resolve conflicts."})
+            if context is None and query:
+                ctx = STATE.retrieval.search(query=query, mode="auto").context
+            else:
                 ctx = SubgraphContext(**context)
-            except Exception as exc:  # noqa: BLE001
-                return _json({"error": f"Invalid context envelope: {exc}"})
-        return _json(
-            STATE.conflicts.resolve_conflicts(
-                ctx, recency_weight=recency_weight, authority_weight=authority_weight
+            return _json(
+                STATE.conflicts.resolve_conflicts(
+                    ctx, recency_weight=recency_weight, authority_weight=authority_weight
+                )
             )
-        )
+        except Exception as exc:  # noqa: BLE001
+            return _json({"error": str(exc), "conflicts": []})
 
     # ------------------------------------------------------------------
     # Contract 20 — Query Triage & ROI Classifier

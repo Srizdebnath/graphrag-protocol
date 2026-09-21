@@ -334,6 +334,11 @@ class EntityType(BaseModel):
         description="Optional example instance for LLM context.",
     )
 
+    @property
+    def name(self) -> str:
+        """Alias for 'type' — used in tool parameters across the protocol."""
+        return self.type
+
 
 class RelationshipType(BaseModel):
     """An edge type with its source/target vertex types."""
@@ -346,6 +351,11 @@ class RelationshipType(BaseModel):
         default_factory=list,
         description="Attribute definitions.",
     )
+
+    @property
+    def name(self) -> str:
+        """Alias for 'type' — used in tool parameters across the protocol."""
+        return self.type
 
 
 class GraphStatistics(BaseModel):

@@ -903,6 +903,10 @@ class TigerGraphAdapter(BaseGraphRAGAdapter):
         except Exception:
             return None
 
+    def embed_text(self, text: str) -> list[float] | None:
+        """Public embedding method delegating to Gemini embedder (Contract 11)."""
+        return self._embed(text)
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

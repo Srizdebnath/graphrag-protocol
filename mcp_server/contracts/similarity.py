@@ -51,8 +51,8 @@ class SimilarityContract:
         if not text_a or not text_b:
             raise ValueError("similarity requires two non-empty text inputs")
 
-        # Try vector cosine
-        embed_fn = getattr(self._adapter, "embed_text", None)
+        # Try vector cosine via adapter embedding
+        embed_fn = getattr(self._adapter, "embed_text", None) or getattr(self._adapter, "_embed", None)
         if callable(embed_fn):
             try:
                 vec_a = embed_fn(text_a)
@@ -61,6 +61,27 @@ class SimilarityContract:
                     score = self._cosine(vec_a, vec_b)
                     return {"score": round(score, 6), "method": "cosine", "terms_a": [], "terms_b": [], "overlap": []}
             except Exception:  # noqa: BLE001, S110 - degrade to jaccard
+                pass
+
+        # Try direct Gemini embedding if API key is in environment
+        import os
+        if os.environ.get("GOOGLE_API_KEY"):
+            try:
+                from google import genai
+                client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+                model = os.environ.get("EMBED_MODEL", "gemini-embedding-001")
+                dim = int(os.environ.get("EMBED_DIM", "512"))
+                resp = client.models.embed_content(
+                    model=model,
+                    contents=[text_a, text_b],
+                    config={"output_dimensionality": dim},
+                )
+                if resp and len(resp.embeddings) >= 2:
+                    vec_a = [float(v) for v in resp.embeddings[0].values]
+                    vec_b = [float(v) for v in resp.embeddings[1].values]
+                    score = self._cosine(vec_a, vec_b)
+                    return {"score": round(score, 6), "method": "cosine", "terms_a": [], "terms_b": [], "overlap": []}
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # Lexical Jaccard fallback

@@ -49,7 +49,7 @@ class IngestionConfig(BaseModel):
     """Contract 4: configuration for document -> knowledge-graph ingestion."""
 
     protocol: str = Field(default="graphrag/1.0")
-    graph_id: str = Field(description="Target graph identifier (TigerGraph graph name).")
+    graph_id: str = Field(default="default", description="Target graph identifier (TigerGraph graph name).")
     document_type: str = Field(
         default="paper",
         description="Document type driving the mapping (paper -> Paper/Author/Concept).",
