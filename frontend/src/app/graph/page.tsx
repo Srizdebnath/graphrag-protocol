@@ -67,7 +67,7 @@ export default function GraphPage() {
         )}
         {error && (
           <div className="absolute inset-4">
-            <ErrorState message={error} hint="Make sure the backend server is running at http://localhost:8000" />
+            <ErrorState message={error} hint="Ensure the backend server is reachable at https://grip-protocol-backend.onrender.com" />
           </div>
         )}
         {!loading && !error && nodes.length === 0 && (

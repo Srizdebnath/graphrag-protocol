@@ -73,7 +73,7 @@ export default function QueryPage() {
       </form>
 
       {loading && <LoadingSpinner label="Running query across all 3 pipelines..." />}
-      {error && <ErrorState message={error} hint="Make sure the backend server is running at http://localhost:8000" />}
+      {error && <ErrorState message={error} hint="Ensure the backend server is reachable at https://grip-protocol-backend.onrender.com" />}
 
       {!loading && !error && !results && (
         <div className="rounded-xl border-3 border-dashed border-black bg-white/70 py-16 text-center font-mono text-xs font-black uppercase tracking-wider text-black/60 shadow-brutal-sm">

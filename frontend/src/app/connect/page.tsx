@@ -264,9 +264,9 @@ const GUIDES: IDEGuide[] = [
     badge: "HTTP / SSE",
     badgeColor: "green",
     description:
-      "Connect OpenAI Agents, Assistant API, or Custom GPTs via GRIP's built-in Streamable HTTP or SSE transport.",
+      "Connect OpenAI Agents, Assistant API, Custom GPTs, or LangGraph to the live cloud GRIP backend or local server.",
     configFile: "Native HTTP endpoint or OpenAPI manifest",
-    installCommand: "grip --transport streamable-http --port 8000",
+    installCommand: "Connect directly to https://grip-protocol-backend.onrender.com or run grip --transport streamable-http",
     configJson: JSON.stringify(
       {
         openapi: "3.1.0",
@@ -276,8 +276,12 @@ const GUIDES: IDEGuide[] = [
         },
         servers: [
           {
+            url: "https://grip-protocol-backend.onrender.com",
+            description: "GRIP Live Production Server",
+          },
+          {
             url: "http://localhost:8000",
-            description: "GRIP Streamable HTTP Server",
+            description: "Local Development Server",
           },
         ],
       },
@@ -285,23 +289,22 @@ const GUIDES: IDEGuide[] = [
       2
     ),
     envVars: [
-      { key: "TIGERGRAPH_HOST", desc: "TigerGraph REST++ endpoint", sample: "https://..." },
-      { key: "GOOGLE_API_KEY", desc: "Gemini API key", sample: "AIzaSy..." },
+      { key: "TIGERGRAPH_HOST", desc: "TigerGraph REST++ endpoint (already configured on cloud backend)", sample: "https://tg-a2a51931-c368-42cf-8b08-70bbfa56410a.tg-3452941248.i.tgcloud.io" },
+      { key: "GOOGLE_API_KEY", desc: "Gemini API key for embeddings & synthesis", sample: "AIzaSy..." },
     ],
     steps: [
       {
-        title: "1. Launch GRIP in Streamable HTTP Mode",
-        detail: "Start the GRIP MCP server with HTTP/SSE transport listening on host & port:",
+        title: "1. Choose Cloud or Local Deployment",
+        detail: "For instant zero-setup access, use the live cloud backend. For local offline development, start the local MCP server:",
         command: "grip --transport streamable-http --host 0.0.0.0 --port 8000",
       },
       {
-        title: "2. Expose via Tunnel (Optional)",
-        detail: "If connecting external cloud agents (e.g. OpenAI Actions / LangSmith), tunnel the port:",
-        command: "ngrok http 8000",
+        title: "2. Live Cloud OpenAPI Spec",
+        detail: "Import the live OpenAPI schema into custom GPTs or LangChain agents from: https://grip-protocol-backend.onrender.com/openapi.json",
       },
       {
         title: "3. Register Tools in OpenAI Agent",
-        detail: "Point your OpenAI assistant or LangChain/LangGraph agent to `http://localhost:8000/mcp`.",
+        detail: "Point your OpenAI assistant or LangChain/LangGraph agent to `https://grip-protocol-backend.onrender.com`.",
       },
     ],
     verificationPrompt:
@@ -487,6 +490,39 @@ export default function ConnectPage() {
           your environment below for step-by-step instructions, copyable configuration
           files, environment variables, and verification prompts.
         </p>
+      </div>
+
+      {/* Live Production Cluster Box */}
+      <div className="rounded-2xl border-4 border-black bg-[#55EFC4] p-6 shadow-brutal space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex h-3 w-3 rounded-full bg-emerald-700 animate-pulse" />
+            <span className="font-mono text-xs font-black uppercase tracking-wider text-black">
+              LIVE CLOUD PRODUCTION BACKEND
+            </span>
+          </div>
+          <span className="font-mono text-xs font-black bg-black text-[#55EFC4] px-2 py-0.5 rounded">
+            ONLINE // TIGERGRAPH + GEMINI
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+          <div className="bg-white p-3 rounded-xl border-2 border-black">
+            <div className="font-black text-black/60 uppercase text-[10px]">Render Backend Base URL</div>
+            <div className="font-bold text-black truncate select-all">https://grip-protocol-backend.onrender.com</div>
+          </div>
+          <div className="bg-white p-3 rounded-xl border-2 border-black">
+            <div className="font-black text-black/60 uppercase text-[10px]">Interactive API Docs</div>
+            <div className="font-bold text-black truncate">
+              <a href="https://grip-protocol-backend.onrender.com/docs" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">
+                https://grip-protocol-backend.onrender.com/docs ↗
+              </a>
+            </div>
+          </div>
+          <div className="bg-white p-3 rounded-xl border-2 border-black">
+            <div className="font-black text-black/60 uppercase text-[10px]">Real-Time SSE Stream</div>
+            <div className="font-bold text-black truncate select-all">https://grip-protocol-backend.onrender.com/stream/events</div>
+          </div>
+        </div>
       </div>
 
       {/* IDE Tabs Selector */}

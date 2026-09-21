@@ -54,7 +54,7 @@ export default function BenchmarkPage() {
         <p className="mb-4 text-xs text-gray-500">Real evaluation measured against the active TigerGraph Cloud backend.</p>
 
         {loading && <LoadingSpinner label="Fetching benchmark results..." />}
-        {error && <ErrorState message={error} hint="Make sure the backend server is running at http://localhost:8000" />}
+        {error && <ErrorState message={error} hint="Ensure the backend server is reachable at https://grip-protocol-backend.onrender.com" />}
 
         {!loading && !error && results.length === 0 && (
           <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 py-12 text-center text-sm text-gray-400">

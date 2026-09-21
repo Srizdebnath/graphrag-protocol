@@ -1,7 +1,7 @@
 import type { BenchmarkResult, GraphSchema, SubgraphContext } from "./types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL || "https://grip-protocol-backend.onrender.com";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;

@@ -4,9 +4,20 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-55EFC4.svg)](https://pypi.org/project/grip-protocol/)
 [![MCP Server](https://img.shields.io/badge/MCP-50%20Tools-74B9FF.svg)](https://modelcontextprotocol.io/)
 [![Formal Contracts](https://img.shields.io/badge/Contracts-20%20RFC%20Standards-A29BFE.svg)](file:///home/ansh/graphrag-protocol/SPEC.md)
-[![Frontend](https://img.shields.io/badge/Next.js-16%20Turbopack-000000.svg)](file:///home/ansh/graphrag-protocol/frontend/)
+[![Live Web Dashboard](https://img.shields.io/badge/Live%20Dashboard-Vercel-000000.svg)](https://graphrag-protocol.vercel.app)
+[![Live API](https://img.shields.io/badge/Live%20Backend-Render-46E3B7.svg)](https://grip-protocol-backend.onrender.com)
 
 **GRIP** is the open RFC standard, high-performance MCP server, and universal execution layer connecting **any AI agent to any Graph database** with strict type safety, cryptographic provenance, and sub-second multi-hop traversal.
+
+### Live Deployments
+
+| Component | Production Endpoint | Status |
+| :--- | :--- | :--- |
+| **Web Dashboard** | [https://graphrag-protocol.vercel.app](https://graphrag-protocol.vercel.app) | Live on Vercel |
+| **Backend API** | [https://grip-protocol-backend.onrender.com](https://grip-protocol-backend.onrender.com) | Live on Render |
+| **Interactive Docs** | [https://grip-protocol-backend.onrender.com/docs](https://grip-protocol-backend.onrender.com/docs) | Swagger UI |
+| **Real-time SSE Stream** | [https://grip-protocol-backend.onrender.com/stream/events](https://grip-protocol-backend.onrender.com/stream/events) | Contract 7 Stream |
+| **Health Check** | [https://grip-protocol-backend.onrender.com/health](https://grip-protocol-backend.onrender.com/health) | TigerGraph + Gemini |
 
 ---
 
