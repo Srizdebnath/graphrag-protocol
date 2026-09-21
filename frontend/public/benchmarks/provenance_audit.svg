@@ -18,7 +18,7 @@
     <rect x="0" y="0" width="160" height="30" rx="6" fill="#55EFC4" stroke="#000000" stroke-width="2.5"/>
     <text x="80" y="20" fill="#000000" font-family="'Courier New', monospace" font-size="12" font-weight="900" text-anchor="middle" letter-spacing="1">CONTRACT 5 // PROVENANCE</text>
 
-    <text x="0" y="68" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="-0.5">ZERO-MOCK CITATION AUDIT TRAIL</text>
+    <text x="0" y="68" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="-0.5">CRYPTOGRAPHIC CITATION AUDIT TRAIL</text>
     <text x="0" y="92" fill="#000000" opacity="0.75" font-family="'Courier New', monospace" font-size="13" font-weight="700">Deterministic verification: Every LLM claim is backed by cryptographically auditable vertex lineages</text>
   </g>
 
@@ -83,8 +83,8 @@
 
     <rect x="12" y="95" width="151" height="70" rx="6" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
     <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">Paper(1706.03762)</text>
-    <text x="20" y="130" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&rarr; [AUTHORED_BY]</text>
-    <text x="20" y="145" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&rarr; Author(Vaswani)</text>
+    <text x="20" y="130" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&#8594; [AUTHORED_BY]</text>
+    <text x="20" y="145" fill="#000000" font-family="'Courier New', monospace" font-size="8" font-weight="900">&#8594; Author(Vaswani)</text>
   </g>
 
   <!-- Arrow 3 -> 4 -->
@@ -107,7 +107,7 @@
     <rect x="12" y="95" width="141" height="70" rx="6" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
     <text x="20" y="115" fill="#000000" font-family="'Courier New', monospace" font-size="9" font-weight="900">doc:arxiv_1706</text>
     <text x="20" y="132" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">chunk_id: c_001</text>
-    <text x="20" y="148" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">verified: TRUE ✅</text>
+    <text x="20" y="148" fill="#000000" opacity="0.7" font-family="'Courier New', monospace" font-size="8">verified: TRUE</text>
   </g>
 
   <!-- Audit Checklist Bottom Deck -->
@@ -136,7 +136,7 @@
         <g transform="translate(510, 0)">
           <rect x="0" y="0" width="250" height="65" rx="8" fill="#55EFC4" stroke="#000000" stroke-width="2"/>
           <text x="14" y="24" fill="#000000" font-family="'Courier New', monospace" font-size="10" font-weight="900">AUDIT VERDICT</text>
-          <text x="14" y="48" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="900">ZERO MOCK ENFORCED</text>
+          <text x="14" y="48" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="20" font-weight="900">PROVENANCE VERIFIED</text>
         </g>
       </g>
     </g>

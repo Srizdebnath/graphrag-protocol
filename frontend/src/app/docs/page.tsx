@@ -162,7 +162,7 @@ export default function DocsPage() {
                 Architectural Guarantees
               </h3>
               <ul className="list-disc list-inside font-mono text-xs font-bold text-black/80 space-y-1.5">
-                <li><strong>Zero-Mock Guarantee</strong>: 100% of tools execute directly against live databases; no stubbed responses.</li>
+                <li><strong>Live Database Execution</strong>: 100% of tools execute directly against connected enterprise graph engines without stubbed responses.</li>
                 <li><strong>Cryptographic Provenance (Contract 5)</strong>: Every answer is tied to source vertex IDs and chunk hashes.</li>
                 <li><strong>Dynamic Token Bounding (Contract 8)</strong>: Output text fits strictly within caller&apos;s token budget.</li>
                 <li><strong>Multi-Backend Federation (Contract 6)</strong>: Single queries fan out across hybrid TigerGraph + Neo4j clusters.</li>

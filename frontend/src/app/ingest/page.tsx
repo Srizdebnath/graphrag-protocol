@@ -27,7 +27,7 @@ interface IngestionReportData {
 export default function IngestPage() {
   // Ingest form state
   const [docId, setDocId] = useState("2609.99999");
-  const [title, setTitle] = useState("Unified GraphRAG with Zero-Mock Guarantees");
+  const [title, setTitle] = useState("Unified GraphRAG with Cryptographic Provenance");
   const [text, setText] = useState(
     "We present a universal GraphRAG interoperability protocol featuring real GSQL execution, verifiable provenance, and streaming mutation feeds."
   );

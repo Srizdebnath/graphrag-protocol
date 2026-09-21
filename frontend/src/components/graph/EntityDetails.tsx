@@ -35,7 +35,7 @@ export default function EntityDetails({ entity, onClose }: EntityDetailsProps) {
           onClick={onClose}
           className="ml-2 rounded-md border-2 border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-brutal-xs hover:bg-yellow-100 active:translate-x-[1px] active:translate-y-[1px] transition-all"
         >
-          ✕
+          X
         </button>
       </div>
 

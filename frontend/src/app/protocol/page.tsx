@@ -516,7 +516,7 @@ export default function ProtocolPage() {
         </h1>
         <p className="max-w-4xl font-mono text-sm md:text-base font-bold text-black/80 leading-relaxed">
           Each contract defines strict architectural invariants, JSON schemas, tool definitions,
-          and guarantees designed to eliminate vendor lock-in and enable zero-mock GraphRAG across any backend.
+          and guarantees designed to eliminate vendor lock-in and enable production-grade GraphRAG across any backend.
         </p>
       </div>
 

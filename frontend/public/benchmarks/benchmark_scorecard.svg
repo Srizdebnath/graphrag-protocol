@@ -96,13 +96,13 @@
     <text x="18" y="160" fill="#000000" opacity="0.8" font-family="'Courier New', monospace" font-size="10" font-weight="700">Claude Code, Cursor, Cline, etc.</text>
   </g>
 
-  <!-- Row 2, Col 3: Zero-Mock Guarantee -->
+  <!-- Row 2, Col 3: Live Database Guarantee -->
   <g transform="translate(605, 335)">
     <rect x="4" y="4" width="250" height="175" rx="12" fill="#000000"/>
     <rect x="0" y="0" width="250" height="175" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="3"/>
 
     <text x="18" y="32" fill="#000000" font-family="'Courier New', monospace" font-size="11" font-weight="900">ARCHITECTURAL GUARANTEE</text>
-    <text x="18" y="80" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="36" font-weight="900">ZERO MOCK</text>
+    <text x="18" y="80" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="36" font-weight="900">LIVE DB</text>
     <text x="18" y="105" fill="#000000" font-family="'Courier New', monospace" font-size="11" font-weight="800">100% Real Backend Backed</text>
     <line x1="18" y1="120" x2="230" y2="120" stroke="#000000" stroke-width="2"/>
     <text x="18" y="145" fill="#000000" opacity="0.8" font-family="'Courier New', monospace" font-size="10" font-weight="700">Contract 10 RBAC Security</text>

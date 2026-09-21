@@ -95,7 +95,7 @@
       <rect x="200" y="2" width="560" height="24" rx="4" fill="#FFFFFF" stroke="#000000" stroke-width="2.5"/>
       <rect x="202" y="4" width="492" height="20" rx="3" fill="#000000"/>
       <rect x="200" y="2" width="492" height="24" rx="4" fill="#FFE600" stroke="#000000" stroke-width="2.5"/>
-      <text x="680" y="18" fill="#000000" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="900" text-anchor="end">88% (+54% 🚀)</text>
+      <text x="680" y="18" fill="#000000" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="900" text-anchor="end">88% (+54% GAIN)</text>
     </g>
   </g>
 
@@ -121,7 +121,7 @@
     <g transform="translate(0, 52)">
       <rect x="200" y="2" width="560" height="24" rx="4" fill="#FFFFFF" stroke="#000000" stroke-width="2.5"/>
       <rect x="200" y="2" width="22" height="24" rx="4" fill="#55EFC4" stroke="#000000" stroke-width="2.5"/>
-      <text x="235" y="18" fill="#000000" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="900">3.1% (93% Reduction! ⭐)</text>
+      <text x="235" y="18" fill="#000000" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="900">3.1% (-93% REDUCTION)</text>
     </g>
   </g>
 

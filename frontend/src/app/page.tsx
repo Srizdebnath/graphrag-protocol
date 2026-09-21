@@ -23,7 +23,7 @@ export default function Home() {
             20 FORMAL CONTRACTS
           </span>
           <span className="rounded-md border-2 border-black bg-[#FDA4AF] px-3 py-1 font-mono text-xs font-black uppercase tracking-wider text-black shadow-brutal-xs">
-            ZERO-MOCK GUARANTEED
+            PRODUCTION READY
           </span>
         </div>
 

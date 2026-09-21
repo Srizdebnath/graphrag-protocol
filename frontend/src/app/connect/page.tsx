@@ -483,7 +483,7 @@ export default function ConnectPage() {
           Connect GRIP MCP to Your Agentic IDE
         </h1>
         <p className="max-w-3xl font-mono text-sm md:text-base font-bold text-black/80 leading-relaxed">
-          Zero-mock GraphRAG across every major AI IDE and developer agent. Choose
+          Enterprise GraphRAG across every major AI IDE and developer agent. Choose
           your environment below for step-by-step instructions, copyable configuration
           files, environment variables, and verification prompts.
         </p>
@@ -618,7 +618,7 @@ export default function ConnectPage() {
               ))}
 
               <div className="rounded-lg border-2 border-dashed border-black bg-white p-3 font-mono text-[11px] font-bold text-black/70">
-                💡 <span className="font-black">Pro Tip:</span> Place a <code>.env</code> file in your workspace root. GRIP automatically parses `.env` on startup.
+                <span className="font-black text-black">PRO TIP:</span> Place a <code>.env</code> file in your workspace root. GRIP automatically parses `.env` on startup.
               </div>
             </div>
           </Card>
@@ -673,12 +673,12 @@ export default function ConnectPage() {
             </a>
           </div>
 
-          {/* Zero Mock Banner */}
+          {/* Production Grade Banner */}
           <div className="rounded-xl border-3 border-black bg-[#A29BFE] p-5 shadow-brutal space-y-2">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-black" />
               <h4 className="font-mono text-xs font-black uppercase text-black">
-                Zero-Mock Guarantee
+                Production-Grade Backend
               </h4>
             </div>
             <p className="font-mono text-[11px] font-bold text-black/80 leading-relaxed">
