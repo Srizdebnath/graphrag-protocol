@@ -77,17 +77,17 @@ export default function ResultsTable({ results }: ResultsTableProps) {
             <tr>
               {header("Query", "query")}
               {header("Category", "category")}
-              {header("LLM-only", "tokens_p1")}
-              {header("Basic RAG", "tokens_p2")}
-              {header("GraphRAG", "tokens_p3")}
+              {header("LLM Tokens", "tokens_p1")}
+              {header("Basic RAG Tokens", "tokens_p2")}
+              {header("GraphRAG Tokens", "tokens_p3")}
               {header("Latency", "latency")}
-              {header("Judge", "judge")}
+              {header("Judge Verdict", "judge")}
             </tr>
           </thead>
           <tbody className="divide-y-2 divide-black/10 bg-white font-mono text-xs">
             {sorted.map((r) => (
               <tr key={r.query_id} className="hover:bg-yellow-50/80 transition-colors">
-                <td className="max-w-[260px] truncate px-3.5 py-2.5 font-bold text-black">{r.query}</td>
+                <td className="max-w-[260px] truncate px-3.5 py-2.5 font-bold text-black" title={r.query}>{r.query}</td>
                 <td className="px-3.5 py-2.5">
                   <Badge color="blue">{r.category}</Badge>
                 </td>
@@ -105,7 +105,7 @@ export default function ResultsTable({ results }: ResultsTableProps) {
                 </td>
                 <td className="px-3.5 py-2.5">
                   {r.evaluation.judge_pass === null ? (
-                    <Badge color="gray">NOT EVALUATED</Badge>
+                    <Badge color="gray">UNEVALUATED</Badge>
                   ) : (
                     <Badge color={r.evaluation.judge_pass ? "green" : "red"}>
                       {r.evaluation.judge_pass ? "PASS" : "FAIL"}

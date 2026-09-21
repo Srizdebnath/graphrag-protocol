@@ -10,28 +10,22 @@ export default function MetricsSummary({ results }: MetricsSummaryProps) {
     if (results.length === 0) return null;
 
     const total = results.length;
-    const avgTokenReduction =
-      (results.reduce(
-        (acc, r) =>
-          acc +
-          ((r.pipeline_1.tokens_total - r.pipeline_3.tokens_total) /
-            r.pipeline_1.tokens_total) *
-            100,
-        0
-      ) / total) *
-      -1;
+    const avgGraphTokens =
+      results.reduce((acc, r) => acc + r.pipeline_3.tokens_total, 0) / total;
     const avgLatency =
       results.reduce((acc, r) => acc + r.pipeline_3.latency_ms, 0) / total;
     const evaluated = results.filter((r) => r.evaluation.judge_pass !== null);
+    const evaluatedCount = evaluated.length;
     const judgePasses = evaluated.filter((r) => r.evaluation.judge_pass).length;
-    const judgePassRate = evaluated.length
-      ? (judgePasses / evaluated.length) * 100
+    const judgePassRate = evaluatedCount
+      ? (judgePasses / evaluatedCount) * 100
       : 0;
 
     return {
       total,
-      avgTokenReduction,
+      avgGraphTokens,
       avgLatency,
+      evaluatedCount,
       judgePassRate,
       judgePasses,
     };
@@ -47,24 +41,27 @@ export default function MetricsSummary({ results }: MetricsSummaryProps) {
       bg: "bg-[#E0E7FF]",
     },
     {
-      label: "Avg Token Reduction",
-      value: `${stats.avgTokenReduction.toFixed(1)}%`,
-      sub: "GraphRAG vs LLM-only",
-      highlight: stats.avgTokenReduction > 0,
+      label: "Avg Graph Context",
+      value: `${Math.round(stats.avgGraphTokens).toLocaleString()} tok`,
+      sub: "Contract 8 Bounded Graph",
+      highlight: true,
       bg: "bg-[#DCFCE7]",
     },
     {
       label: "Avg Latency",
       value: `${stats.avgLatency.toFixed(0)}ms`,
-      sub: "GraphRAG pipeline",
+      sub: "Agentic GraphRAG (Live Cloud DB)",
       bg: "bg-[#FEF08A]",
     },
     {
       label: "Judge Pass Rate",
-      value: `${stats.judgePassRate.toFixed(0)}%`,
-      sub: `${stats.judgePasses}/${stats.total} queries passed`,
-      highlight: stats.judgePassRate >= 90,
-      bg: "bg-[#FCE7F3]",
+      value: stats.evaluatedCount > 0 ? `${stats.judgePassRate.toFixed(0)}%` : "N/A",
+      sub:
+        stats.evaluatedCount > 0
+          ? `${stats.judgePasses}/${stats.evaluatedCount} evaluated passed`
+          : "API quota limited / unevaluated",
+      highlight: stats.evaluatedCount > 0 && stats.judgePassRate >= 80,
+      bg: stats.evaluatedCount > 0 ? "bg-[#FCE7F3]" : "bg-[#F1F5F9]",
     },
   ];
 
