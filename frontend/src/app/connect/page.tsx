@@ -272,7 +272,7 @@ const GUIDES: IDEGuide[] = [
         openapi: "3.1.0",
         info: {
           title: "GRIP Knowledge Graph MCP API",
-          version: "0.4.0",
+          version: "0.5.0",
         },
         servers: [
           {
@@ -479,7 +479,7 @@ export default function ConnectPage() {
       <div className="rounded-2xl border-4 border-black bg-white p-8 shadow-brutal-xl space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge color="amber">STEP-BY-STEP SETUP</Badge>
-          <Badge color="green">v0.4.0 VERIFIED</Badge>
+          <Badge color="green">v0.5.0 VERIFIED</Badge>
           <Badge color="blue">50 MCP TOOLS</Badge>
         </div>
         <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-black">
@@ -666,7 +666,7 @@ export default function ConnectPage() {
                 <Zap className="h-4 w-4 text-black" />
                 Included 50 MCP Tools
               </h3>
-              <Badge color="green">v0.4.0</Badge>
+              <Badge color="green">v0.5.0</Badge>
             </div>
 
             <div className="space-y-2 text-xs font-mono">

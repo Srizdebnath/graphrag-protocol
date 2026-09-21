@@ -1,6 +1,6 @@
 # GRIP // Universal GraphRAG Interoperability Protocol
 
-[![PyPI Version](https://img.shields.io/pypi/v/grip-protocol.svg?color=FFE600&label=PyPI%20Package)](https://pypi.org/project/grip-protocol/0.4.0/)
+[![PyPI Version](https://img.shields.io/pypi/v/grip-protocol.svg?color=FFE600&label=PyPI%20Package)](https://pypi.org/project/grip-protocol/0.5.0/)
 [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-55EFC4.svg)](https://pypi.org/project/grip-protocol/)
 [![MCP Server](https://img.shields.io/badge/MCP-50%20Tools-74B9FF.svg)](https://modelcontextprotocol.io/)
 [![Formal Contracts](https://img.shields.io/badge/Contracts-20%20RFC%20Standards-A29BFE.svg)](file:///home/ansh/graphrag-protocol/SPEC.md)
@@ -73,7 +73,7 @@ Evaluated across **49,656 vertices** and **79,044 edges** on TigerGraph Cloud + 
 
 ```bash
 # Install the core protocol and MCP server
-pip install grip-protocol==0.4.0
+pip install grip-protocol==0.5.0
 
 # Or install from source with dev & test suites
 git clone <repository-url>

@@ -274,7 +274,7 @@ def build_server() -> MCPServer:
     """Construct the MCP server with all 50 tools, resources, and prompts registered."""
     mcp = MCPServer(
         name="grip",
-        version="0.4.0",
+        version="0.5.0",
         instructions=(
             "GraphRAG Interoperability Protocol (GRIP): uniform access to any GraphRAG backend. "
             "Use graphrag_search for natural-language queries, graphrag_agent_investigate for "
@@ -656,7 +656,7 @@ def build_server() -> MCPServer:
     def graphrag_config() -> str:
         return _json({
             "protocol": "graphrag/1.0",
-            "server_version": "0.4.0",
+            "server_version": "0.5.0",
             "backend_adapter": type(STATE.adapter).__name__,
             "default_max_tokens": _DEFAULT_MAX_TOKENS,
             "extraction_strategy": _DEFAULT_EXTRACTION_STRATEGY,

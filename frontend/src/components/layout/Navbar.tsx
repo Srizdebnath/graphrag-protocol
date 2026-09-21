@@ -46,14 +46,14 @@ export default function Navbar() {
             <span className="text-[#55EFC4]">GRIP</span> {"//"} PROTOCOL
           </Link>
           <a
-            href="https://pypi.org/project/grip-protocol/0.4.0/"
+            href="https://pypi.org/project/grip-protocol/0.5.0/"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-white px-2 py-0.5 font-mono text-[10px] font-black uppercase text-black shadow-brutal-xs hover:bg-emerald-100 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all"
-            title="View v0.4.0 on PyPI"
+            title="View v0.5.0 on PyPI"
           >
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>v0.4.0</span>
+            <span>v0.5.0</span>
             <ExternalLink className="h-2.5 w-2.5 text-black/60" />
           </a>
         </div>
@@ -233,12 +233,12 @@ export default function Navbar() {
           {/* External links in mobile menu */}
           <div className="pt-2 border-t-2 border-black/20">
             <a
-              href="https://pypi.org/project/grip-protocol/0.4.0/"
+              href="https://pypi.org/project/grip-protocol/0.5.0/"
               target="_blank"
               rel="noopener noreferrer"
               className="block text-center rounded-lg border-2 border-black bg-white py-2 font-mono text-xs font-black uppercase shadow-brutal-xs hover:bg-yellow-100"
             >
-              PyPI v0.4.0 Package &rarr;
+              PyPI v0.5.0 Package &rarr;
             </a>
           </div>
         </div>

@@ -14,7 +14,7 @@ export default function Home() {
             RFC PROTOCOL SPECIFICATION
           </span>
           <span className="rounded-md border-2 border-black bg-black px-3 py-1 font-mono text-xs font-black uppercase tracking-wider text-[#55EFC4] shadow-brutal-xs">
-            v0.4.0 ON PYPI
+            v0.5.0 ON PYPI
           </span>
           <span className="rounded-md border-2 border-black bg-[#55EFC4] px-3 py-1 font-mono text-xs font-black uppercase tracking-wider text-black shadow-brutal-xs">
             50 MCP TOOLS

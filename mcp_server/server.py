@@ -196,7 +196,7 @@ def _load_benchmark_queries(limit: int = 3) -> list[dict[str, Any]]:
 cors_env = os.environ.get("CORS_ORIGINS", "*")
 allowed_origins = [o.strip() for o in cors_env.split(",")] if cors_env != "*" else ["*"]
 
-app = FastAPI(title="GraphRAG Protocol Server", version="0.4.0")
+app = FastAPI(title="GraphRAG Protocol Server", version="0.5.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -211,7 +211,7 @@ def root() -> dict[str, Any]:
     return {
         "name": "GraphRAG Protocol API",
         "status": "online",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "health": "/health",
         "docs": "/docs",
     }

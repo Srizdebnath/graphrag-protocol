@@ -39,7 +39,7 @@ export default function DocsPage() {
       {/* Docs Header Banner */}
       <div className="rounded-2xl border-4 border-black bg-white p-8 shadow-brutal-xl space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge color="green">SPECIFICATION v0.4.0</Badge>
+          <Badge color="green">SPECIFICATION v0.5.0</Badge>
           <Badge color="amber">RFC STANDARD</Badge>
           <Badge color="purple">20 WIRE CONTRACTS</Badge>
         </div>
