@@ -206,6 +206,17 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict[str, Any]:
+    return {
+        "name": "GraphRAG Protocol API",
+        "status": "online",
+        "version": "0.4.0",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     status = _ADAPTER.health_check()
